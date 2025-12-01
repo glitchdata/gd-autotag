@@ -281,8 +281,16 @@ class PostTagger
         // Sort by frequency
         arsort($word_freq);
         
-        // Get top 10 words
-        $tags = array_slice(array_keys($word_freq), 0, 10);
+        // Get max tags setting (default 10)
+        $max_tags = isset($options['max_tags_per_post']) ? intval($options['max_tags_per_post']) : 10;
+        if ($max_tags < 1) {
+            $max_tags = 10;
+        } elseif ($max_tags > 50) {
+            $max_tags = 50;
+        }
+        
+        // Get top N words based on setting
+        $tags = array_slice(array_keys($word_freq), 0, $max_tags);
         
         // Capitalize first letter
         $tags = array_map('ucfirst', $tags);

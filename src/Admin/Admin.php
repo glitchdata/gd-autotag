@@ -111,6 +111,14 @@ class Admin
         );
         
         add_settings_field(
+            'max_tags_per_post',
+            'Maximum Tags Per Post',
+            [$this, 'render_max_tags_field'],
+            'wp-plugin-auto-tagging',
+            'wp_plugin_auto_tagging_section'
+        );
+        
+        add_settings_field(
             'tag_exclusion_list',
             'Tag Exclusion List',
             [$this, 'render_tag_exclusion_field'],
@@ -210,6 +218,18 @@ class Admin
         
         if (isset($input['auto_tag_enabled'])) {
             $sanitized['auto_tag_enabled'] = (bool) $input['auto_tag_enabled'];
+        }
+        
+        if (isset($input['max_tags_per_post'])) {
+            $max_tags = absint($input['max_tags_per_post']);
+            if ($max_tags < 1) {
+                $max_tags = 10;
+            } elseif ($max_tags > 50) {
+                $max_tags = 50;
+            }
+            $sanitized['max_tags_per_post'] = $max_tags;
+        } else {
+            $sanitized['max_tags_per_post'] = 10;
         }
         
         if (isset($input['tag_exclusion_list'])) {
@@ -357,6 +377,25 @@ class Admin
             • <strong>Bulk Action:</strong> "Generate Tags" option in the Posts list for multiple posts<br>
             • <strong>Row Action:</strong> "Generate Tags" link on individual posts in the Posts list<br>
             • <strong>Meta Box:</strong> Tag generator in the post editor sidebar
+        </p>
+        <?php
+    }
+
+    public function render_max_tags_field(): void
+    {
+        $options = get_option('wp_plugin_options', []);
+        $max_tags = isset($options['max_tags_per_post']) ? $options['max_tags_per_post'] : 10;
+        ?>
+        <input type="number" 
+               name="wp_plugin_options[max_tags_per_post]" 
+               value="<?php echo esc_attr($max_tags); ?>" 
+               min="1" 
+               max="50" 
+               step="1"
+               class="small-text" />
+        <p class="description">
+            Maximum number of tags to generate per post (1-50). Default is 10.<br>
+            The system analyzes post content by word frequency and will generate up to this many tags.
         </p>
         <?php
     }
