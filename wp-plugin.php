@@ -32,6 +32,14 @@ if (! class_exists('WpPlugin\\Plugin')) {
     require_once WP_PLUGIN_DIR . 'src/Plugin.php';
 }
 
+// Load plugin-update-checker via submodule if not already available through Composer
+if (! class_exists('Puc_v4_Factory')) {
+    $pucFile = __DIR__ . '/vendor/plugin-update-checker/plugin-update-checker.php';
+    if (file_exists($pucFile)) {
+        require_once $pucFile;
+    }
+}
+
 // Optional: GitHub update checker via yahniselsts/plugin-update-checker
 // When the library is installed via Composer, initialize updates from GitHub Releases.
 if (class_exists('Puc_v4_Factory')) {

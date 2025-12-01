@@ -3,8 +3,7 @@
     "description": "wp_plugin - WordPress plugin scaffold",
     "type": "wordpress-plugin",
     "require": {
-        "php": ">=8.0",
-        "yahniselsts/plugin-update-checker": "^4.13"
+        "php": ">=8.0"
     },
     "autoload": {
         "psr-4": {
