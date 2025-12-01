@@ -134,10 +134,100 @@ The plugin can automatically generate tags for posts based on content analysis:
 - **Individual Posts**: Click "Generate Tags" link in post row actions
 - **Post Editor Meta Box**: Generate tags directly from the post editor sidebar
 - **Smart Filtering**: Automatically excludes common words and custom exclusion list
-- **Frequency Analysis**: Identifies top 10 most relevant words from title and content
+- **Frequency Analysis**: Identifies top words from title and content
+- **AI Optimization**: Optional AI-powered tag refinement and optimization
+
+#### AI-Powered Tag Optimization
+
+Enable AI integration to enhance tag quality with semantic understanding and SEO optimization.
+
+**Supported AI Providers:**
+- **OpenAI**: GPT-3.5 Turbo or GPT-4 models
+- **Anthropic**: Claude 3 Haiku or Sonnet models
+- **Google**: Gemini Pro model
+- **Custom**: Configure your own AI endpoint
+
+**AI Features:**
+- Contextual understanding of post content
+- Semantic similarity analysis
+- Industry-specific tag suggestions
+- Duplicate and similar tag consolidation
+- SEO-focused refinement
+- Intelligent tag prioritization
+
+**Configuration:**
+
+1. Enable "AI Tag Optimization" in Auto Tagging settings
+2. Select your AI provider (OpenAI, Anthropic, Google, or Custom)
+3. Enter your provider's API key
+4. Configure maximum tags per post (1-50)
+
+**Getting API Keys:**
+- OpenAI: [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+- Anthropic: [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys)
+- Google: [makersuite.google.com/app/apikey](https://makersuite.google.com/app/apikey)
+
+**Custom AI Endpoint:**
+
+For custom AI implementations, configure the endpoint via filter:
+
+```php
+add_filter('wp_plugin_custom_ai_endpoint', function($endpoint) {
+    return 'https://your-ai-service.com/api/optimize-tags';
+});
+
+// Optionally customize headers
+add_filter('wp_plugin_custom_ai_headers', function($headers) {
+    return [
+        'Content-Type' => 'application/json',
+        'X-API-Key' => 'your-api-key',
+    ];
+});
+
+// Customize request body format
+add_filter('wp_plugin_custom_ai_body', function($body, $tags, $title, $content) {
+    return json_encode([
+        'tags' => $tags,
+        'title' => $title,
+        'content' => substr($content, 0, 500),
+        'action' => 'optimize',
+    ]);
+}, 10, 4);
+
+// Parse custom response format
+add_filter('wp_plugin_custom_ai_parse_response', function($tags, $response) {
+    return $response['optimized_tags'] ?? $tags;
+}, 10, 2);
+```
+
+**AI Model Customization:**
+
+Override default AI models using filters:
+
+```php
+// Use GPT-4 instead of GPT-3.5
+add_filter('wp_plugin_openai_model', function($model) {
+    return 'gpt-4';
+});
+
+// Use Claude 3 Sonnet instead of Haiku
+add_filter('wp_plugin_anthropic_model', function($model) {
+    return 'claude-3-sonnet-20240229';
+});
+
+// Use specific Gemini model
+add_filter('wp_plugin_google_model', function($model) {
+    return 'gemini-1.5-pro';
+});
+```
+
+**Storage:**
+- AI optimization enabled: `wp_plugin_options['ai_optimization_enabled']`
+- AI provider: `wp_plugin_options['ai_provider']`
+- AI API key: `wp_plugin_options['ai_api_key']` (stored securely)
 
 #### Tag Exclusion List:
-Located in **Advanced Settings**, this feature allows you to specify words that should never be used as tags. The system automatically excludes common words like "the", "and", "or", etc., plus any custom words you add.
+Located in **Auto Tagging Settings**, this feature allows you to specify words that should never be used as tags. The system automatically excludes common words like "the", "and", "or", etc., plus any custom words you add.
 
 **Storage Location:**
 - Option name: `wp_plugin_options`

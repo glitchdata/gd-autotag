@@ -25,7 +25,13 @@ class PostTagger
 
     public function add_bulk_action($bulk_actions): array
     {
-        $bulk_actions['wp_plugin_generate_tags'] = 'Generate Tags';
+        $options = get_option('wp_plugin_options', []);
+        $enabled = isset($options['auto_tag_enabled']) ? $options['auto_tag_enabled'] : false;
+        
+        if ($enabled) {
+            $bulk_actions['wp_plugin_generate_tags'] = 'Generate Tags';
+        }
+        
         return $bulk_actions;
     }
 
@@ -48,8 +54,11 @@ class PostTagger
 
     public function add_row_action($actions, $post)
     {
-        // Only add for published posts
-        if ($post->post_status === 'publish' && $post->post_type === 'post') {
+        $options = get_option('wp_plugin_options', []);
+        $enabled = isset($options['auto_tag_enabled']) ? $options['auto_tag_enabled'] : false;
+        
+        // Only add for published posts and when feature is enabled
+        if ($enabled && $post->post_status === 'publish' && $post->post_type === 'post') {
             $url = wp_nonce_url(
                 admin_url('admin.php?action=wp_plugin_generate_single_tag&post=' . $post->ID),
                 'wp_plugin_generate_single_tag_' . $post->ID
@@ -122,14 +131,20 @@ class PostTagger
 
     public function add_meta_box(): void
     {
-        add_meta_box(
-            'wp_plugin_tag_generator',
-            'Auto Tag Generator',
-            [$this, 'render_meta_box'],
-            'post',
-            'side',
-            'default'
-        );
+        $options = get_option('wp_plugin_options', []);
+        $enabled = isset($options['auto_tag_enabled']) ? $options['auto_tag_enabled'] : false;
+        
+        // Only add meta box if feature is enabled
+        if ($enabled) {
+            add_meta_box(
+                'wp_plugin_tag_generator',
+                'Auto Tag Generator',
+                [$this, 'render_meta_box'],
+                'post',
+                'side',
+                'default'
+            );
+        }
     }
 
     public function render_meta_box($post): void
@@ -227,6 +242,13 @@ class PostTagger
         
         if (empty($tags)) {
             return false;
+        }
+
+        // Apply AI optimization if enabled
+        $ai_enabled = isset($options['ai_optimization_enabled']) ? $options['ai_optimization_enabled'] : false;
+        if ($ai_enabled && !empty($options['ai_api_key'])) {
+            $ai_optimizer = new AITagOptimizer();
+            $tags = $ai_optimizer->optimize_tags($tags, $post->post_content, $post->post_title);
         }
 
         // Set tags for the post

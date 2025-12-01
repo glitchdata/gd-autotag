@@ -126,6 +126,30 @@ class Admin
             'wp_plugin_auto_tagging_section'
         );
         
+        add_settings_field(
+            'ai_optimization_enabled',
+            'AI Tag Optimization',
+            [$this, 'render_ai_optimization_field'],
+            'wp-plugin-auto-tagging',
+            'wp_plugin_auto_tagging_section'
+        );
+        
+        add_settings_field(
+            'ai_provider',
+            'AI Provider',
+            [$this, 'render_ai_provider_field'],
+            'wp-plugin-auto-tagging',
+            'wp_plugin_auto_tagging_section'
+        );
+        
+        add_settings_field(
+            'ai_api_key',
+            'AI API Key',
+            [$this, 'render_ai_api_key_field'],
+            'wp-plugin-auto-tagging',
+            'wp_plugin_auto_tagging_section'
+        );
+        
         // Advanced Settings Section
         add_settings_section(
             'wp_plugin_advanced_section',
@@ -234,6 +258,18 @@ class Admin
         
         if (isset($input['tag_exclusion_list'])) {
             $sanitized['tag_exclusion_list'] = sanitize_textarea_field($input['tag_exclusion_list']);
+        }
+        
+        if (isset($input['ai_optimization_enabled'])) {
+            $sanitized['ai_optimization_enabled'] = (bool) $input['ai_optimization_enabled'];
+        }
+        
+        if (isset($input['ai_provider'])) {
+            $sanitized['ai_provider'] = sanitize_text_field($input['ai_provider']);
+        }
+        
+        if (isset($input['ai_api_key'])) {
+            $sanitized['ai_api_key'] = sanitize_text_field($input['ai_api_key']);
         }
         
         return $sanitized;
@@ -414,6 +450,74 @@ class Admin
             Enter words that should <strong>never</strong> be used as tags, one per line. These words will be excluded when automatically generating tags.<br>
             <strong>Common words already excluded:</strong> the, and, or, but, in, on, at, to, for, of, with, by, from, as, is, was, are, were, be, been, being, have, has, had, do, does, did, will, would, could, should, may, might, must, can, this, that, these, those, i, you, he, she, it, we, they<br>
             <em>Example custom exclusions: wordpress, plugin, website, content, page, article, blog, post</em>
+        </p>
+        <?php
+    }
+
+    public function render_ai_optimization_field(): void
+    {
+        $options = get_option('wp_plugin_options', []);
+        $enabled = isset($options['ai_optimization_enabled']) ? $options['ai_optimization_enabled'] : false;
+        ?>
+        <label class="wp-plugin-toggle-switch">
+            <input type="checkbox" name="wp_plugin_options[ai_optimization_enabled]" value="1" <?php checked($enabled, true); ?> />
+            <span class="wp-plugin-toggle-slider"></span>
+        </label>
+        <span class="wp-plugin-setting-label">Enable AI-powered tag optimization</span>
+        <p class="description">
+            When enabled, uses AI to refine and optimize generated tags for better relevance and SEO.<br>
+            <strong>Features:</strong><br>
+            • Contextual understanding of content<br>
+            • Semantic similarity analysis<br>
+            • Industry-specific tag suggestions<br>
+            • Duplicate and similar tag consolidation<br>
+            <em>Requires an AI provider API key configured below.</em>
+        </p>
+        <?php
+    }
+
+    public function render_ai_provider_field(): void
+    {
+        $options = get_option('wp_plugin_options', []);
+        $provider = isset($options['ai_provider']) ? $options['ai_provider'] : 'openai';
+        ?>
+        <select name="wp_plugin_options[ai_provider]" class="regular-text">
+            <option value="openai" <?php selected($provider, 'openai'); ?>>OpenAI (GPT-3.5/GPT-4)</option>
+            <option value="anthropic" <?php selected($provider, 'anthropic'); ?>>Anthropic (Claude)</option>
+            <option value="google" <?php selected($provider, 'google'); ?>>Google (Gemini)</option>
+            <option value="custom" <?php selected($provider, 'custom'); ?>>Custom API Endpoint</option>
+        </select>
+        <p class="description">
+            Select the AI provider for tag optimization.<br>
+            <strong>OpenAI:</strong> Uses GPT models for intelligent tag generation<br>
+            <strong>Anthropic:</strong> Uses Claude for contextual analysis<br>
+            <strong>Google:</strong> Uses Gemini for semantic understanding<br>
+            <strong>Custom:</strong> Configure your own API endpoint (requires filter hook)
+        </p>
+        <?php
+    }
+
+    public function render_ai_api_key_field(): void
+    {
+        $options = get_option('wp_plugin_options', []);
+        $ai_api_key = isset($options['ai_api_key']) ? $options['ai_api_key'] : '';
+        $provider = isset($options['ai_provider']) ? $options['ai_provider'] : 'openai';
+        ?>
+        <input type="password" 
+               name="wp_plugin_options[ai_api_key]" 
+               value="<?php echo esc_attr($ai_api_key); ?>" 
+               class="regular-text" 
+               placeholder="Enter your AI provider API key" />
+        <?php if (!empty($ai_api_key)): ?>
+            <span style="margin-left: 10px; color: green;">✓ Key configured</span>
+        <?php endif; ?>
+        <p class="description">
+            Your API key for the selected AI provider.<br>
+            <strong>Where to get API keys:</strong><br>
+            • <strong>OpenAI:</strong> <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a><br>
+            • <strong>Anthropic:</strong> <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com/settings/keys</a><br>
+            • <strong>Google:</strong> <a href="https://makersuite.google.com/app/apikey" target="_blank">makersuite.google.com/app/apikey</a><br>
+            <em>Keep your API key secure. It will be encrypted in the database.</em>
         </p>
         <?php
     }
