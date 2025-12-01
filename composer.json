@@ -4,8 +4,7 @@
     "type": "wordpress-plugin",
     "require": {
         "php": ">=8.0",
-        "yahniselsts/plugin-update-checker": "^4.13"
-
+        "yahnis-elsts/plugin-update-checker": "^5.0"
     },
     "autoload": {
         "psr-4": {
