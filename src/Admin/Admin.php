@@ -318,6 +318,64 @@ class Admin
             </div>
 
             <div class="card">
+                <h2>Posts Summary</h2>
+                <?php
+                // Get post counts
+                $post_counts = wp_count_posts('post');
+                $total_posts = $post_counts->publish + $post_counts->draft + $post_counts->pending;
+                $published_posts = $post_counts->publish;
+                
+                // Get posts with tags count
+                $posts_with_tags = $this->get_posts_with_tags_count();
+                $posts_without_tags = $published_posts - $posts_with_tags;
+                
+                // Get total tag count
+                $total_tags = wp_count_terms(['taxonomy' => 'post_tag', 'hide_empty' => false]);
+                ?>
+                <table class="form-table">
+                    <tr>
+                        <th>Total Posts:</th>
+                        <td><?php echo esc_html($total_posts); ?></td>
+                    </tr>
+                    <tr>
+                        <th>Published Posts:</th>
+                        <td><?php echo esc_html($published_posts); ?></td>
+                    </tr>
+                    <tr>
+                        <th>Posts with Tags:</th>
+                        <td>
+                            <span style="color: green;"><?php echo esc_html($posts_with_tags); ?></span>
+                            <?php if ($published_posts > 0): ?>
+                                (<?php echo esc_html(round(($posts_with_tags / $published_posts) * 100)); ?>%)
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Posts without Tags:</th>
+                        <td>
+                            <?php if ($posts_without_tags > 0): ?>
+                                <span style="color: orange;"><?php echo esc_html($posts_without_tags); ?></span>
+                            <?php else: ?>
+                                <span style="color: green;">0</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Total Tags:</th>
+                        <td><?php echo esc_html($total_tags); ?></td>
+                    </tr>
+                </table>
+                <?php if ($posts_without_tags > 0): ?>
+                    <p style="margin-top: 10px;">
+                        <a href="<?php echo admin_url('edit.php?post_type=post'); ?>" class="button button-secondary">
+                            View Posts
+                        </a>
+                        <em style="margin-left: 10px;">Use the "Generate Tags" bulk action to add tags automatically.</em>
+                    </p>
+                <?php endif; ?>
+            </div>
+
+            <div class="card">
                 <h2>Update Status</h2>
                 <?php if ($manualCheckPerformed): ?>
                     <div class="notice notice-success inline">
@@ -415,5 +473,24 @@ class Admin
         // Access global update checker instance if stored
         global $wp_plugin_update_checker;
         return $wp_plugin_update_checker ?? null;
+    }
+
+    private function get_posts_with_tags_count(): int
+    {
+        global $wpdb;
+        
+        // Query to count published posts that have at least one tag
+        $query = "
+            SELECT COUNT(DISTINCT p.ID)
+            FROM {$wpdb->posts} p
+            INNER JOIN {$wpdb->term_relationships} tr ON p.ID = tr.object_id
+            INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
+            WHERE p.post_type = 'post'
+            AND p.post_status = 'publish'
+            AND tt.taxonomy = 'post_tag'
+        ";
+        
+        $count = $wpdb->get_var($query);
+        return (int) $count;
     }
 }
