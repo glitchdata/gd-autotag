@@ -45,8 +45,8 @@ class Admin
             : plugin_dir_url($this->file) . 'assets/img/glitchdata_logo1.png';
 
         add_menu_page(
-            'Plugin Dashboard', // Page title
-            'Dashboard',        // Menu title
+            'WP Plugin',        // Page title
+            'WP Plugin',        // Menu title
             'manage_options',
             'wp-plugin',
             [$this, 'render_admin_page'],
