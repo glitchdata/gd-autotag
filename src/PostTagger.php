@@ -9,6 +9,10 @@ class PostTagger
         add_filter('bulk_actions-edit-post', [$this, 'add_bulk_action']);
         add_filter('handle_bulk_actions-edit-post', [$this, 'handle_bulk_action'], 10, 3);
         
+        // Add row action to individual posts
+        add_filter('post_row_actions', [$this, 'add_row_action'], 10, 2);
+        add_action('admin_action_wp_plugin_generate_single_tag', [$this, 'handle_single_tag_generation']);
+        
         // Add admin notice
         add_action('admin_notices', [$this, 'bulk_action_admin_notice']);
         
@@ -42,6 +46,61 @@ class PostTagger
         return $redirect_to;
     }
 
+    public function add_row_action($actions, $post)
+    {
+        // Only add for published posts
+        if ($post->post_status === 'publish' && $post->post_type === 'post') {
+            $url = wp_nonce_url(
+                admin_url('admin.php?action=wp_plugin_generate_single_tag&post=' . $post->ID),
+                'wp_plugin_generate_single_tag_' . $post->ID
+            );
+            
+            $actions['wp_plugin_generate_tags'] = sprintf(
+                '<a href="%s" title="%s">%s</a>',
+                esc_url($url),
+                esc_attr__('Generate tags for this post', 'wp-plugin'),
+                esc_html__('Generate Tags', 'wp-plugin')
+            );
+        }
+        
+        return $actions;
+    }
+
+    public function handle_single_tag_generation(): void
+    {
+        // Check if post ID is provided
+        if (!isset($_GET['post'])) {
+            wp_die('No post specified.');
+        }
+
+        $post_id = intval($_GET['post']);
+
+        // Verify nonce
+        if (!wp_verify_nonce($_GET['_wpnonce'], 'wp_plugin_generate_single_tag_' . $post_id)) {
+            wp_die('Security check failed.');
+        }
+
+        // Check user permissions
+        if (!current_user_can('edit_post', $post_id)) {
+            wp_die('You do not have permission to edit this post.');
+        }
+
+        // Generate tags
+        $success = $this->generate_tags_for_post($post_id);
+
+        // Redirect back to posts list with message
+        $redirect_url = admin_url('edit.php?post_type=post');
+        
+        if ($success) {
+            $redirect_url = add_query_arg('wp_plugin_single_tag_generated', '1', $redirect_url);
+        } else {
+            $redirect_url = add_query_arg('wp_plugin_single_tag_failed', '1', $redirect_url);
+        }
+
+        wp_redirect($redirect_url);
+        exit;
+    }
+
     public function bulk_action_admin_notice(): void
     {
         if (!empty($_REQUEST['wp_plugin_tags_generated'])) {
@@ -50,6 +109,14 @@ class PostTagger
                 '<div class="notice notice-success is-dismissible"><p>Generated tags for %d post(s).</p></div>',
                 $count
             );
+        }
+        
+        if (!empty($_REQUEST['wp_plugin_single_tag_generated'])) {
+            echo '<div class="notice notice-success is-dismissible"><p>Tags generated successfully for the post.</p></div>';
+        }
+        
+        if (!empty($_REQUEST['wp_plugin_single_tag_failed'])) {
+            echo '<div class="notice notice-error is-dismissible"><p>Failed to generate tags for the post.</p></div>';
         }
     }
 
