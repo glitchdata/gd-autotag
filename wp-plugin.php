@@ -29,7 +29,7 @@ if (file_exists(__DIR__ . '/vendor/autoload.php')) {
 
 // Load the plugin bootstrap
 if (! class_exists('WpPlugin\\Plugin')) {
-    require_once WP_PLUGIN_DIR . 'src/Plugin.php';
+    require_once __DIR__ . '/src/Plugin.php';
 }
 
 // Load plugin-update-checker via submodule if not already available through Composer
