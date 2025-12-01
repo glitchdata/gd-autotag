@@ -193,10 +193,11 @@ class Admin
         $options = get_option('wp_plugin_options', []);
         $enabled = isset($options['enable_feature']) ? $options['enable_feature'] : false;
         ?>
-        <label>
+        <label class="wp-plugin-toggle-switch">
             <input type="checkbox" name="wp_plugin_options[enable_feature]" value="1" <?php checked($enabled, true); ?> />
-            Enable this feature
+            <span class="wp-plugin-toggle-slider"></span>
         </label>
+        <span class="wp-plugin-setting-label">Enable this feature</span>
         <p class="description">Check to enable the main plugin feature.</p>
         <?php
     }
@@ -220,10 +221,11 @@ class Admin
         $options = get_option('wp_plugin_options', []);
         $debug = isset($options['debug_mode']) ? $options['debug_mode'] : false;
         ?>
-        <label>
+        <label class="wp-plugin-toggle-switch">
             <input type="checkbox" name="wp_plugin_options[debug_mode]" value="1" <?php checked($debug, true); ?> />
-            Enable debug mode
+            <span class="wp-plugin-toggle-slider"></span>
         </label>
+        <span class="wp-plugin-setting-label">Enable debug mode</span>
         <p class="description">Enable debug logging for troubleshooting.</p>
         <?php
     }
@@ -233,10 +235,11 @@ class Admin
         $options = get_option('wp_plugin_options', []);
         $enabled = isset($options['auto_tag_enabled']) ? $options['auto_tag_enabled'] : false;
         ?>
-        <label>
+        <label class="wp-plugin-toggle-switch">
             <input type="checkbox" name="wp_plugin_options[auto_tag_enabled]" value="1" <?php checked($enabled, true); ?> />
-            Enable automatic tag generation
+            <span class="wp-plugin-toggle-slider"></span>
         </label>
+        <span class="wp-plugin-setting-label">Enable automatic tag generation</span>
         <p class="description">Allow bulk tag generation from the Posts list page. Also adds a meta box to individual posts.</p>
         <?php
     }
