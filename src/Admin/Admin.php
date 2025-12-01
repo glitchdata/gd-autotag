@@ -42,13 +42,20 @@ class Admin
 
     public function add_admin_menu(): void
     {
+        // Prefer crisp 20x20 icon if available, else fall back to original
+        $menu_rel = 'assets/img/icons/menu-icon-20x20.png';
+        $menu_path = plugin_dir_path($this->file) . $menu_rel;
+        $icon_url = file_exists($menu_path)
+            ? plugin_dir_url($this->file) . $menu_rel
+            : plugin_dir_url($this->file) . 'assets/img/glitchdata_logo1.png';
+
         add_menu_page(
             'wp_plugin',
             'wp_plugin',
             'manage_options',
             'wp-plugin',
             [$this, 'render_admin_page'],
-            plugin_dir_url($this->file) . 'assets/img/glitchdata_logo1.png'
+            $icon_url
         );
         
         add_submenu_page(
