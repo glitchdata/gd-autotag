@@ -15,6 +15,7 @@ class Admin
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_assets']);
         add_action('admin_menu', [$this, 'add_admin_menu']);
         add_action('admin_init', [$this, 'register_settings']);
+        add_filter('plugin_action_links_' . plugin_basename($this->file), [$this, 'add_action_links']);
     }
 
     public function enqueue_admin_assets(): void
@@ -22,6 +23,16 @@ class Admin
         $suffix = defined('SCRIPT_DEBUG') && SCRIPT_DEBUG ? '' : '.min';
         wp_enqueue_style('wp-plugin-admin', plugin_dir_url($this->file) . 'assets/css/admin' . $suffix . '.css', [], WP_PLUGIN_VERSION);
         wp_enqueue_script('wp-plugin-admin', plugin_dir_url($this->file) . 'assets/js/admin.js', ['jquery'], WP_PLUGIN_VERSION, true);
+    }
+
+    public function add_action_links($links): array
+    {
+        $settings_link = '<a href="' . admin_url('admin.php?page=wp-plugin-settings') . '">Settings</a>';
+        $dashboard_link = '<a href="' . admin_url('admin.php?page=wp-plugin') . '">Dashboard</a>';
+        
+        array_unshift($links, $settings_link, $dashboard_link);
+        
+        return $links;
     }
 
     public function add_admin_menu(): void
