@@ -239,7 +239,11 @@ class PostTagger
     {
         $text = $post->post_title . ' ' . strip_tags($post->post_content);
         
-        // Remove common words
+        // Get plugin options for exclusion list
+        $options = get_option('wp_plugin_options', []);
+        $exclusion_list = isset($options['tag_exclusion_list']) ? $options['tag_exclusion_list'] : '';
+        
+        // Build common words list
         $common_words = [
             'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
             'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'be',
@@ -248,6 +252,20 @@ class PostTagger
             'that', 'these', 'those', 'i', 'you', 'he', 'she', 'it', 'we', 'they'
         ];
         
+        // Add custom exclusion words
+        if (!empty($exclusion_list)) {
+            $custom_exclusions = array_filter(
+                array_map('trim', explode("\n", strtolower($exclusion_list))),
+                function($word) {
+                    return !empty($word);
+                }
+            );
+            $common_words = array_merge($common_words, $custom_exclusions);
+        }
+        
+        // Make exclusion list unique and lowercase
+        $common_words = array_unique(array_map('strtolower', $common_words));
+        
         // Extract words (2+ characters)
         preg_match_all('/\b[a-z]{2,}\b/i', $text, $matches);
         $words = $matches[0];
@@ -255,7 +273,7 @@ class PostTagger
         // Count word frequency
         $word_freq = array_count_values(array_map('strtolower', $words));
         
-        // Remove common words
+        // Remove common words and exclusion list
         foreach ($common_words as $common) {
             unset($word_freq[$common]);
         }

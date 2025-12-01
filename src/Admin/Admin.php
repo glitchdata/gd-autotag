@@ -119,6 +119,14 @@ class Admin
             'wp-plugin-settings',
             'wp_plugin_general_section'
         );
+        
+        add_settings_field(
+            'tag_exclusion_list',
+            'Tag Exclusion List',
+            [$this, 'render_tag_exclusion_field'],
+            'wp-plugin-settings',
+            'wp_plugin_advanced_section'
+        );
     }
 
     public function sanitize_settings($input)
@@ -139,6 +147,10 @@ class Admin
         
         if (isset($input['auto_tag_enabled'])) {
             $sanitized['auto_tag_enabled'] = (bool) $input['auto_tag_enabled'];
+        }
+        
+        if (isset($input['tag_exclusion_list'])) {
+            $sanitized['tag_exclusion_list'] = sanitize_textarea_field($input['tag_exclusion_list']);
         }
         
         return $sanitized;
@@ -241,6 +253,23 @@ class Admin
         </label>
         <span class="wp-plugin-setting-label">Enable automatic tag generation</span>
         <p class="description">Allow bulk tag generation from the Posts list page. Also adds a meta box to individual posts.</p>
+        <?php
+    }
+
+    public function render_tag_exclusion_field(): void
+    {
+        $options = get_option('wp_plugin_options', []);
+        $exclusion_list = isset($options['tag_exclusion_list']) ? $options['tag_exclusion_list'] : '';
+        ?>
+        <textarea name="wp_plugin_options[tag_exclusion_list]" 
+                  rows="5" 
+                  cols="50" 
+                  class="large-text code"
+                  placeholder="Enter words to exclude, one per line"><?php echo esc_textarea($exclusion_list); ?></textarea>
+        <p class="description">
+            Enter words that should not be used as tags, one per line. These words will be excluded when automatically generating tags.
+            <br><em>Example: the, and, or, but, with, from, into, about</em>
+        </p>
         <?php
     }
 
