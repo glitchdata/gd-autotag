@@ -138,7 +138,40 @@ class Admin
         }
         
         if (isset($input['api_key'])) {
-            $sanitized['api_key'] = sanitize_text_field($input['api_key']);
+            $api_key = sanitize_text_field($input['api_key']);
+            
+            // Validate API key format if provided
+            if (!empty($api_key)) {
+                // Check minimum length
+                if (strlen($api_key) < 20) {
+                    add_settings_error(
+                        'wp_plugin_messages',
+                        'wp_plugin_api_key_error',
+                        'API Key must be at least 20 characters long.',
+                        'error'
+                    );
+                }
+                // Check for valid characters (alphanumeric, dashes, underscores)
+                elseif (!preg_match('/^[a-zA-Z0-9_-]+$/', $api_key)) {
+                    add_settings_error(
+                        'wp_plugin_messages',
+                        'wp_plugin_api_key_error',
+                        'API Key can only contain letters, numbers, dashes, and underscores.',
+                        'error'
+                    );
+                }
+                else {
+                    $sanitized['api_key'] = $api_key;
+                    add_settings_error(
+                        'wp_plugin_messages',
+                        'wp_plugin_api_key_success',
+                        'API Key validated successfully.',
+                        'success'
+                    );
+                }
+            } else {
+                $sanitized['api_key'] = '';
+            }
         }
         
         if (isset($input['debug_mode'])) {
@@ -218,13 +251,32 @@ class Admin
     {
         $options = get_option('wp_plugin_options', []);
         $api_key = isset($options['api_key']) ? $options['api_key'] : '';
+        $is_valid = $this->validate_api_key_format($api_key);
         ?>
         <input type="text" 
                name="wp_plugin_options[api_key]" 
                value="<?php echo esc_attr($api_key); ?>" 
                class="regular-text" 
                placeholder="Enter your API key" />
-        <p class="description">Your API key for external services.</p>
+        <?php if (!empty($api_key)): ?>
+            <span style="margin-left: 10px;">
+                <?php if ($is_valid): ?>
+                    <span style="color: green;">✓ Valid format</span>
+                <?php else: ?>
+                    <span style="color: red;">✗ Invalid format</span>
+                <?php endif; ?>
+            </span>
+        <?php endif; ?>
+        <p class="description">
+            Your API key for external services.<br>
+            <strong>Format requirements:</strong>
+            <ul style="margin: 5px 0 0 20px;">
+                <li>Minimum 20 characters</li>
+                <li>Only letters (a-z, A-Z), numbers (0-9), dashes (-), and underscores (_)</li>
+                <li>No spaces or special characters</li>
+            </ul>
+            <em>Example: my-api-key-1234567890abcdef_xyz</em>
+        </p>
         <?php
     }
 
@@ -310,6 +362,7 @@ class Admin
                 $enabled = isset($options['enable_feature']) ? $options['enable_feature'] : false;
                 $debug = isset($options['debug_mode']) ? $options['debug_mode'] : false;
                 $has_api_key = !empty($options['api_key']);
+                $api_key_valid = $this->validate_api_key_format($options['api_key'] ?? '');
                 ?>
                 <table class="form-table">
                     <tr>
@@ -325,8 +378,11 @@ class Admin
                     <tr>
                         <th>API Key:</th>
                         <td>
-                            <?php if ($has_api_key): ?>
-                                <span style="color: green;">✓ Configured</span>
+                            <?php if ($has_api_key && $api_key_valid): ?>
+                                <span style="color: green;">✓ Configured & Valid</span>
+                                <span style="color: #666; font-size: 12px;">(<?php echo esc_html(strlen($options['api_key'])); ?> characters)</span>
+                            <?php elseif ($has_api_key && !$api_key_valid): ?>
+                                <span style="color: red;">✗ Invalid Format</span>
                             <?php else: ?>
                                 <span style="color: #999;">○ Not set</span>
                             <?php endif; ?>
@@ -561,5 +617,24 @@ class Admin
         
         $count = $wpdb->get_var($query);
         return (int) $count;
+    }
+
+    private function validate_api_key_format(string $api_key): bool
+    {
+        if (empty($api_key)) {
+            return false;
+        }
+        
+        // Check minimum length
+        if (strlen($api_key) < 20) {
+            return false;
+        }
+        
+        // Check for valid characters (alphanumeric, dashes, underscores)
+        if (!preg_match('/^[a-zA-Z0-9_-]+$/', $api_key)) {
+            return false;
+        }
+        
+        return true;
     }
 }
