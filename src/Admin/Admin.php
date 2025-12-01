@@ -161,16 +161,39 @@ class Admin
                     );
                 }
                 else {
-                    $sanitized['api_key'] = $api_key;
-                    add_settings_error(
-                        'wp_plugin_messages',
-                        'wp_plugin_api_key_success',
-                        'API Key validated successfully.',
-                        'success'
-                    );
+                    // Validate with external license server
+                    $license_check = $this->verify_api_key_license($api_key);
+                    
+                    if ($license_check['valid']) {
+                        $sanitized['api_key'] = $api_key;
+                        $sanitized['api_key_license_status'] = 'valid';
+                        $sanitized['api_key_license_data'] = $license_check['data'];
+                        $sanitized['api_key_last_checked'] = time();
+                        
+                        add_settings_error(
+                            'wp_plugin_messages',
+                            'wp_plugin_api_key_success',
+                            'API Key validated successfully. License: ' . esc_html($license_check['data']['license_type'] ?? 'Active'),
+                            'success'
+                        );
+                    } else {
+                        $sanitized['api_key'] = $api_key;
+                        $sanitized['api_key_license_status'] = 'invalid';
+                        $sanitized['api_key_license_data'] = [];
+                        $sanitized['api_key_last_checked'] = time();
+                        
+                        add_settings_error(
+                            'wp_plugin_messages',
+                            'wp_plugin_api_key_error',
+                            'API Key format is valid, but license verification failed: ' . esc_html($license_check['message']),
+                            'error'
+                        );
+                    }
                 }
             } else {
                 $sanitized['api_key'] = '';
+                $sanitized['api_key_license_status'] = '';
+                $sanitized['api_key_license_data'] = [];
             }
         }
         
@@ -363,6 +386,9 @@ class Admin
                 $debug = isset($options['debug_mode']) ? $options['debug_mode'] : false;
                 $has_api_key = !empty($options['api_key']);
                 $api_key_valid = $this->validate_api_key_format($options['api_key'] ?? '');
+                $license_status = $options['api_key_license_status'] ?? '';
+                $license_data = $options['api_key_license_data'] ?? [];
+                $last_checked = $options['api_key_last_checked'] ?? 0;
                 ?>
                 <table class="form-table">
                     <tr>
@@ -388,6 +414,33 @@ class Admin
                             <?php endif; ?>
                         </td>
                     </tr>
+                    <?php if ($has_api_key && $api_key_valid): ?>
+                    <tr>
+                        <th>License Status:</th>
+                        <td>
+                            <?php if ($license_status === 'valid'): ?>
+                                <span style="color: green;">✓ Active License</span>
+                                <?php if (!empty($license_data['license_type'])): ?>
+                                    <span style="color: #666; font-size: 12px;"> - <?php echo esc_html(ucfirst($license_data['license_type'])); ?></span>
+                                <?php endif; ?>
+                                <br>
+                                <?php if (!empty($license_data['expires_at'])): ?>
+                                    <span style="color: #666; font-size: 12px;">Expires: <?php echo esc_html(date('Y-m-d', strtotime($license_data['expires_at']))); ?></span>
+                                <?php endif; ?>
+                                <?php if (!empty($license_data['customer_name'])): ?>
+                                    <br><span style="color: #666; font-size: 12px;">Licensed to: <?php echo esc_html($license_data['customer_name']); ?></span>
+                                <?php endif; ?>
+                            <?php elseif ($license_status === 'invalid'): ?>
+                                <span style="color: red;">✗ License Verification Failed</span>
+                            <?php else: ?>
+                                <span style="color: #999;">○ Not Verified</span>
+                            <?php endif; ?>
+                            <?php if ($last_checked > 0): ?>
+                                <br><span style="color: #999; font-size: 11px;">Last checked: <?php echo human_time_diff($last_checked); ?> ago</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endif; ?>
                     <tr>
                         <th>Debug Mode:</th>
                         <td>
@@ -636,5 +689,60 @@ class Admin
         }
         
         return true;
+    }
+
+    private function verify_api_key_license(string $api_key): array
+    {
+        // Configure your license server endpoint
+        $license_server_url = apply_filters('wp_plugin_license_server_url', 'https://api.example.com/v1/verify-license');
+        
+        // Build the request
+        $response = wp_remote_post($license_server_url, [
+            'timeout' => 15,
+            'headers' => [
+                'Content-Type' => 'application/json',
+            ],
+            'body' => json_encode([
+                'api_key' => $api_key,
+                'site_url' => get_site_url(),
+                'plugin_version' => WP_PLUGIN_VERSION,
+            ]),
+        ]);
+        
+        // Check for errors
+        if (is_wp_error($response)) {
+            return [
+                'valid' => false,
+                'message' => 'Could not connect to license server: ' . $response->get_error_message(),
+                'data' => [],
+            ];
+        }
+        
+        $status_code = wp_remote_retrieve_response_code($response);
+        $body = wp_remote_retrieve_body($response);
+        $data = json_decode($body, true);
+        
+        // Check response
+        if ($status_code === 200 && isset($data['valid']) && $data['valid'] === true) {
+            return [
+                'valid' => true,
+                'message' => 'License verified successfully',
+                'data' => [
+                    'license_type' => $data['license_type'] ?? 'standard',
+                    'expires_at' => $data['expires_at'] ?? null,
+                    'customer_name' => $data['customer_name'] ?? '',
+                    'max_sites' => $data['max_sites'] ?? 1,
+                ],
+            ];
+        }
+        
+        // License validation failed
+        $error_message = $data['message'] ?? 'Invalid license key';
+        
+        return [
+            'valid' => false,
+            'message' => $error_message,
+            'data' => [],
+        ];
     }
 }

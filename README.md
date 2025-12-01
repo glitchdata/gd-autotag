@@ -55,9 +55,74 @@ my-api-key-1234567890abcdef_xyz
 - Dashboard shows API key status: "Configured & Valid", "Invalid Format", or "Not set"
 - Character count displayed for valid keys
 
+**External License Verification:**
+
+The plugin automatically verifies API keys against an external license server when saving settings.
+
+**License Server Integration:**
+- Endpoint URL can be configured via filter: `wp_plugin_license_server_url`
+- Default endpoint: `https://api.example.com/v1/verify-license`
+- Verification includes site URL and plugin version
+- Timeout: 15 seconds
+
+**License Response Data:**
+- License type (standard, premium, enterprise, etc.)
+- Expiration date
+- Customer name
+- Maximum allowed sites
+
+**Dashboard Display:**
+- Shows license status: "Active License", "License Verification Failed", or "Not Verified"
+- Displays license type and expiration date
+- Shows last verification timestamp
+- Customer name if provided by license server
+
+**Configuring License Server:**
+
+Add to your theme's `functions.php` or custom plugin:
+
+```php
+add_filter('wp_plugin_license_server_url', function($url) {
+    return 'https://yourdomain.com/api/verify-license';
+});
+```
+
+**License Server API Format:**
+
+Request:
+```json
+{
+  "api_key": "your-api-key-here",
+  "site_url": "https://example.com",
+  "plugin_version": "0.1.1"
+}
+```
+
+Response (Success):
+```json
+{
+  "valid": true,
+  "license_type": "premium",
+  "expires_at": "2026-12-31",
+  "customer_name": "John Doe",
+  "max_sites": 5
+}
+```
+
+Response (Failure):
+```json
+{
+  "valid": false,
+  "message": "Invalid license key or expired"
+}
+```
+
 **Storage:**
 - Option name: `wp_plugin_options`
 - Field key: `api_key`
+- License status: `api_key_license_status`
+- License data: `api_key_license_data`
+- Last checked: `api_key_last_checked`
 - Database: WordPress `wp_options` table (sanitized and encrypted in transit)
 
 ### Automatic Tag Generation
