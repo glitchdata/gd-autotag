@@ -94,12 +94,36 @@ class Admin
             'wp_plugin_general_section'
         );
         
+        // Auto Tagging Settings Section
+        add_settings_section(
+            'wp_plugin_auto_tagging_section',
+            'Auto Tagging Settings',
+            [$this, 'render_auto_tagging_section'],
+            'wp-plugin-auto-tagging'
+        );
+        
+        add_settings_field(
+            'auto_tag_enabled',
+            'Enable Auto-Tagging',
+            [$this, 'render_auto_tag_field'],
+            'wp-plugin-auto-tagging',
+            'wp_plugin_auto_tagging_section'
+        );
+        
+        add_settings_field(
+            'tag_exclusion_list',
+            'Tag Exclusion List',
+            [$this, 'render_tag_exclusion_field'],
+            'wp-plugin-auto-tagging',
+            'wp_plugin_auto_tagging_section'
+        );
+        
         // Advanced Settings Section
         add_settings_section(
             'wp_plugin_advanced_section',
             'Advanced Settings',
             [$this, 'render_advanced_section'],
-            'wp-plugin-settings'
+            'wp-plugin-advanced'
         );
         
         // Example setting: Debug mode
@@ -107,24 +131,7 @@ class Admin
             'debug_mode',
             'Debug Mode',
             [$this, 'render_debug_mode_field'],
-            'wp-plugin-settings',
-            'wp_plugin_advanced_section'
-        );
-        
-        // Tag generation settings
-        add_settings_field(
-            'auto_tag_enabled',
-            'Auto-Tag Posts',
-            [$this, 'render_auto_tag_field'],
-            'wp-plugin-settings',
-            'wp_plugin_general_section'
-        );
-        
-        add_settings_field(
-            'tag_exclusion_list',
-            'Tag Exclusion List',
-            [$this, 'render_tag_exclusion_field'],
-            'wp-plugin-settings',
+            'wp-plugin-advanced',
             'wp_plugin_advanced_section'
         );
     }
@@ -218,6 +225,9 @@ class Admin
             return;
         }
         
+        // Determine active tab
+        $active_tab = isset($_GET['tab']) ? sanitize_text_field($_GET['tab']) : 'general';
+        
         // Show success message if settings saved
         if (isset($_GET['settings-updated'])) {
             add_settings_error('wp_plugin_messages', 'wp_plugin_message', 'Settings Saved', 'updated');
@@ -232,13 +242,23 @@ class Admin
             
             <h2 class="nav-tab-wrapper">
                 <a href="?page=wp-plugin" class="nav-tab">Dashboard</a>
-                <a href="?page=wp-plugin-settings" class="nav-tab nav-tab-active">Settings</a>
+                <a href="?page=wp-plugin-settings&tab=general" class="nav-tab <?php echo $active_tab === 'general' ? 'nav-tab-active' : ''; ?>">General</a>
+                <a href="?page=wp-plugin-settings&tab=auto-tagging" class="nav-tab <?php echo $active_tab === 'auto-tagging' ? 'nav-tab-active' : ''; ?>">Auto Tagging</a>
+                <a href="?page=wp-plugin-settings&tab=advanced" class="nav-tab <?php echo $active_tab === 'advanced' ? 'nav-tab-active' : ''; ?>">Advanced</a>
             </h2>
             
             <form method="post" action="options.php">
                 <?php
                 settings_fields('wp_plugin_settings');
-                do_settings_sections('wp-plugin-settings');
+                
+                if ($active_tab === 'general') {
+                    do_settings_sections('wp-plugin-settings');
+                } elseif ($active_tab === 'auto-tagging') {
+                    do_settings_sections('wp-plugin-auto-tagging');
+                } elseif ($active_tab === 'advanced') {
+                    do_settings_sections('wp-plugin-advanced');
+                }
+                
                 submit_button('Save Settings');
                 ?>
             </form>
@@ -249,6 +269,11 @@ class Admin
     public function render_general_section(): void
     {
         echo '<p>Configure general plugin settings below.</p>';
+    }
+
+    public function render_auto_tagging_section(): void
+    {
+        echo '<p>Configure automatic tag generation for posts. The system analyzes post content and generates relevant tags based on word frequency.</p>';
     }
 
     public function render_advanced_section(): void
@@ -327,7 +352,12 @@ class Admin
             <span class="wp-plugin-toggle-slider"></span>
         </label>
         <span class="wp-plugin-setting-label">Enable automatic tag generation</span>
-        <p class="description">Allow bulk tag generation from the Posts list page. Also adds a meta box to individual posts.</p>
+        <p class="description">
+            When enabled, adds the following features:<br>
+            • <strong>Bulk Action:</strong> "Generate Tags" option in the Posts list for multiple posts<br>
+            • <strong>Row Action:</strong> "Generate Tags" link on individual posts in the Posts list<br>
+            • <strong>Meta Box:</strong> Tag generator in the post editor sidebar
+        </p>
         <?php
     }
 
@@ -337,13 +367,14 @@ class Admin
         $exclusion_list = isset($options['tag_exclusion_list']) ? $options['tag_exclusion_list'] : '';
         ?>
         <textarea name="wp_plugin_options[tag_exclusion_list]" 
-                  rows="5" 
+                  rows="8" 
                   cols="50" 
                   class="large-text code"
                   placeholder="Enter words to exclude, one per line"><?php echo esc_textarea($exclusion_list); ?></textarea>
         <p class="description">
-            Enter words that should not be used as tags, one per line. These words will be excluded when automatically generating tags.
-            <br><em>Example: the, and, or, but, with, from, into, about</em>
+            Enter words that should <strong>never</strong> be used as tags, one per line. These words will be excluded when automatically generating tags.<br>
+            <strong>Common words already excluded:</strong> the, and, or, but, in, on, at, to, for, of, with, by, from, as, is, was, are, were, be, been, being, have, has, had, do, does, did, will, would, could, should, may, might, must, can, this, that, these, those, i, you, he, she, it, we, they<br>
+            <em>Example custom exclusions: wordpress, plugin, website, content, page, article, blog, post</em>
         </p>
         <?php
     }
