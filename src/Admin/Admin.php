@@ -284,6 +284,21 @@ class Admin
         return $sanitized;
     }
 
+    public function render_general_section(): void
+    {
+        echo '<p>Configure the core plugin behavior and API access.</p>';
+    }
+
+    public function render_auto_tagging_section(): void
+    {
+        echo '<p>Control how automatic tag generation behaves across your posts.</p>';
+    }
+
+    public function render_advanced_section(): void
+    {
+        echo '<p>Advanced options for debugging, AI integrations, and power users.</p>';
+    }
+
     public function render_api_key_field(): void
     {
         $options = get_option('wp_plugin_options', []);
