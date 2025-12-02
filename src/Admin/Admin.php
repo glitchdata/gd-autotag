@@ -85,15 +85,6 @@ class Admin
             'wp-plugin-settings'
         );
         
-        // Example setting: Enable feature
-        add_settings_field(
-            'enable_feature',
-            'Enable Feature',
-            [$this, 'render_enable_feature_field'],
-            'wp-plugin-settings',
-            'wp_plugin_general_section'
-        );
-        
         // Example setting: API Key
         add_settings_field(
             'api_key',
@@ -180,10 +171,6 @@ class Admin
     public function sanitize_settings($input)
     {
         $sanitized = [];
-        
-        if (isset($input['enable_feature'])) {
-            $sanitized['enable_feature'] = (bool) $input['enable_feature'];
-        }
         
         if (isset($input['api_key'])) {
             $api_key = sanitize_text_field($input['api_key']);
@@ -600,7 +587,6 @@ class Admin
                             <h2>Current Settings</h2>
                             <?php
                             $options = get_option('wp_plugin_options', []);
-                            $enabled = isset($options['enable_feature']) ? $options['enable_feature'] : false;
                             $debug = isset($options['debug_mode']) ? $options['debug_mode'] : false;
                             $has_api_key = !empty($options['api_key']);
                             $api_key_valid = $this->validate_api_key_format($options['api_key'] ?? '');
@@ -609,16 +595,6 @@ class Admin
                             $last_checked = $options['api_key_last_checked'] ?? 0;
                             ?>
                             <table class="form-table">
-                                <tr>
-                                    <th>Feature Status:</th>
-                                    <td>
-                                        <?php if ($enabled): ?>
-                                            <span style="color: green;">✓ Enabled</span>
-                                        <?php else: ?>
-                                            <span style="color: #999;">○ Disabled</span>
-                                        <?php endif; ?>
-                                    </td>
-                                </tr>
                                 <tr>
                                     <th>API Key:</th>
                                     <td>
