@@ -22,7 +22,16 @@ class Admin
     {
         $suffix = defined('SCRIPT_DEBUG') && SCRIPT_DEBUG ? '' : '.min';
         wp_enqueue_style('wp-plugin-admin', plugin_dir_url($this->file) . 'assets/css/admin' . $suffix . '.css', [], WP_PLUGIN_VERSION);
-        wp_enqueue_script('wp-plugin-admin', plugin_dir_url($this->file) . 'assets/js/admin.js', ['jquery'], WP_PLUGIN_VERSION, true);
+
+        wp_enqueue_script('d3', 'https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js', [], '7.8.5', true);
+        wp_enqueue_script('wp-plugin-admin', plugin_dir_url($this->file) . 'assets/js/admin.js', ['jquery', 'd3'], WP_PLUGIN_VERSION, true);
+
+        $current_page = $_GET['page'] ?? '';
+        if ($current_page === 'wp-plugin') {
+            wp_localize_script('wp-plugin-admin', 'wpPluginDashboardData', [
+                'postTimeline' => $this->get_monthly_post_stats(12),
+            ]);
+        }
     }
 
     public function add_action_links($links): array
@@ -685,23 +694,8 @@ class Admin
                     </div>
 
                     <h3 style="margin-top: 20px;">Post Analytics (Last 12 Months)</h3>
-                    <div class="wp-plugin-posts-timeline" aria-label="Posts published per month">
-                        <?php foreach ($timeline as $point): 
-                            $height = round(($point['total'] / $timelineMax) * 100);
-                            $taggedPct = $point['total'] > 0 ? round(($point['tagged'] / $point['total']) * 100) : 0;
-                            $untaggedPct = 100 - $taggedPct;
-                            $title = esc_attr(sprintf('%s %d — Total: %d, Tagged: %d, Untagged: %d', $point['label'], $point['year'], $point['total'], $point['tagged'], $point['untagged']));
-                        ?>
-                            <div class="wp-plugin-post-bar" style="height: <?php echo (int) $height; ?>%;" title="<?php echo $title; ?>" aria-label="<?php echo $title; ?>">
-                                <span class="segment tagged" style="height: <?php echo (int) $taggedPct; ?>%"></span>
-                                <span class="segment untagged" style="height: <?php echo (int) $untaggedPct; ?>%"></span>
-                                <span class="value"><?php echo (int) $point['total']; ?></span>
-                                <span class="label"><?php echo esc_html($point['label']); ?></span>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                    <div class="wp-plugin-legend">
-                        <span class="dot tagged"></span> Tagged &nbsp;&nbsp; <span class="dot untagged"></span> Untagged
+                    <div id="wp-plugin-post-timeline" class="wp-plugin-line-chart" aria-label="Posts over time">
+                        <noscript>Enable JavaScript to view the post analytics line chart.</noscript>
                     </div>
                 </div>
 

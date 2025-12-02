@@ -108,65 +108,29 @@
 	color: #d63638;
 }
 
-.wp-plugin-posts-timeline {
-	display: flex;
-	align-items: flex-end;
-	gap: 10px;
-	height: 180px;
+.wp-plugin-line-chart {
 	margin-top: 16px;
-	padding-bottom: 24px;
-	border-bottom: 1px dashed #ddd;
-}
-
-.wp-plugin-post-bar {
+	min-height: 260px;
+	border: 1px solid #e2e2e2;
+	border-radius: 6px;
+	padding: 8px;
 	position: relative;
-	width: 28px;
-	background: #e5e5e5;
-	border-radius: 4px 4px 0 0;
-	overflow: hidden;
 }
 
-.wp-plugin-post-bar .segment {
-	position: absolute;
-	left: 0;
+.wp-plugin-line-chart svg {
 	width: 100%;
+	height: 240px;
 }
 
-.wp-plugin-post-bar .segment.tagged {
-	background: #2271b1;
-	bottom: 0;
-}
-
-.wp-plugin-post-bar .segment.untagged {
-	background: #f0b429;
-	bottom: 0;
-}
-
-.wp-plugin-post-bar .value {
-	position: absolute;
-	top: -20px;
-	left: 50%;
-	transform: translateX(-50%);
-	font-size: 11px;
-	color: #333;
-}
-
-.wp-plugin-post-bar .label {
-	position: absolute;
-	bottom: -18px;
-	left: 50%;
-	transform: translateX(-50%);
-	font-size: 11px;
-	color: #666;
-}
-
-.wp-plugin-legend {
-	margin-top: 8px;
+.wp-plugin-line-legend {
+	display: flex;
+	gap: 16px;
 	font-size: 12px;
+	margin-top: 8px;
 	color: #555;
 }
 
-.wp-plugin-legend .dot {
+.wp-plugin-line-legend .dot {
 	display: inline-block;
 	width: 10px;
 	height: 10px;
@@ -174,10 +138,22 @@
 	margin-right: 6px;
 }
 
-.wp-plugin-legend .dot.tagged {
-	background: #2271b1;
+.wp-plugin-line-legend .dot.total {
+	background: #1d6fa5;
 }
 
-.wp-plugin-legend .dot.untagged {
-	background: #f0b429;
+.wp-plugin-line-legend .dot.tagged {
+	background: #1fb141;
+}
+
+.wp-plugin-line-tooltip {
+	position: absolute;
+	background: #1d2327;
+	color: #fff;
+	font-size: 12px;
+	padding: 6px 8px;
+	border-radius: 4px;
+	pointer-events: none;
+	opacity: 0;
+	transition: opacity .15s ease;
 }
