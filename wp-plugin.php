@@ -2,8 +2,8 @@
 /**
  * Plugin Name: wp_plugin
  * Plugin URI:  https://github.com/terence/wp-plugin
- * Description: Plugin for Wordpress automation using AI.
- * Version:     0.1.1
+ * Description: Plugin for Content automation using AI.
+ * Version:     0.1.5
  * Author:      Trevor Rock
  * Author URI:  https://github.com/terence/
  * Text Domain: wp-plugin
@@ -18,7 +18,7 @@ if (! defined('WPINC')) {
 }
 
 // Plugin constants
-define('WP_PLUGIN_VERSION', '0.1.1');
+define('WP_PLUGIN_VERSION', '0.1.5');
 define('WP_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('WP_PLUGIN_FILE', __FILE__);
 define('WP_PLUGIN_ROOT', __DIR__);

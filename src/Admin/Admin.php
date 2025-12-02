@@ -20,13 +20,13 @@ class Admin
 
     public function enqueue_admin_assets(): void
     {
-        $suffix = defined('SCRIPT_DEBUG') && SCRIPT_DEBUG ? '' : '.min';
-        wp_enqueue_style('wp-plugin-admin', plugin_dir_url($this->file) . 'assets/css/admin' . $suffix . '.css', [], WP_PLUGIN_VERSION);
+        $assets_url = plugin_dir_url($this->file) . 'assets/';
+        wp_enqueue_style('wp-plugin-admin', $assets_url . 'css/admin.css', [], WP_PLUGIN_VERSION);
 
         wp_enqueue_script('d3', 'https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js', [], '7.8.5', true);
-        wp_enqueue_script('wp-plugin-admin', plugin_dir_url($this->file) . 'assets/js/admin.js', ['jquery', 'd3'], WP_PLUGIN_VERSION, true);
+        wp_enqueue_script('wp-plugin-admin', $assets_url . 'js/admin.js', ['jquery', 'd3'], WP_PLUGIN_VERSION, true);
 
-        $current_page = $_GET['page'] ?? '';
+        $current_page = isset($_GET['page']) ? sanitize_key($_GET['page']) : '';
         if ($current_page === 'wp-plugin') {
             wp_localize_script('wp-plugin-admin', 'wpPluginDashboardData', [
                 'postTimeline' => $this->get_monthly_post_stats(12),
