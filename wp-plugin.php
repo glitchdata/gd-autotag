@@ -17,11 +17,22 @@ if (! defined('WPINC')) {
     die;
 }
 
-// Plugin constants
-define('WP_PLUGIN_VERSION', '0.1.5');
-define('WP_PLUGIN_DIR', plugin_dir_path(__FILE__));
-define('WP_PLUGIN_FILE', __FILE__);
-define('WP_PLUGIN_ROOT', __DIR__);
+// Plugin constants (guarded to avoid redefinition in MU/loader contexts)
+if (! defined('WP_PLUGIN_VERSION')) {
+    define('WP_PLUGIN_VERSION', '0.1.5');
+}
+
+if (! defined('WP_PLUGIN_DIR')) {
+    define('WP_PLUGIN_DIR', plugin_dir_path(__FILE__));
+}
+
+if (! defined('WP_PLUGIN_FILE')) {
+    define('WP_PLUGIN_FILE', __FILE__);
+}
+
+if (! defined('WP_PLUGIN_ROOT')) {
+    define('WP_PLUGIN_ROOT', __DIR__);
+}
 
 // Load composer autoloader when present
 if (file_exists(__DIR__ . '/vendor/autoload.php')) {
