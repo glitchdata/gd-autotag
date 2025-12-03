@@ -1,11 +1,11 @@
 <?php
 /**
  * Plugin Name: GD AutoTag
- * Plugin URI:  https://github.com/terence/gd-autotag
+ * Plugin URI:  https://github.com/glitchdata/gd-autotag
  * Description: Plugin for Content automation using AI.
  * Version:     0.1.5
- * Author:      Trevor Rock
- * Author URI:  https://github.com/terence/
+ * Author:      Glitchdata
+ * Author URI:  https://github.com/glitchdata/
  * Text Domain: gd-autotag
  * Domain Path: /languages
  * License:     MIT
