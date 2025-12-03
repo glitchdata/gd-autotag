@@ -141,7 +141,97 @@
             ]
         });
 
+        renderTopTagsPie();
+
         renderLineChart({
+    function renderTopTagsPie() {
+        if (typeof d3 === 'undefined' || typeof wpPluginDashboardData === 'undefined') {
+            return;
+        }
+
+        var container = document.getElementById('wp-plugin-top-tags-chart');
+        if (!container) {
+            return;
+        }
+
+        var data = (wpPluginDashboardData.topTags || []).slice(0, 8);
+
+        if (!data.length) {
+            container.innerHTML = '<p style="padding: 12px;">No tag data available yet.</p>';
+            return;
+        }
+
+        container.innerHTML = '';
+
+        var width = 320;
+        var height = 260;
+        var radius = Math.min(width, height) / 2;
+
+        var svg = d3.select(container)
+            .append('svg')
+            .attr('width', width)
+            .attr('height', height)
+            .append('g')
+            .attr('transform', 'translate(' + width / 2 + ',' + height / 2 + ')');
+
+        var color = d3.scaleOrdinal()
+            .domain(data.map(function (d) { return d.name; }))
+            .range(['#6c5ce7', '#00b894', '#0984e3', '#fdcb6e', '#e17055', '#fd79a8', '#636e72', '#2d3436']);
+
+        var pie = d3.pie()
+            .value(function (d) { return d.count; })
+            .sort(null);
+
+        var arc = d3.arc()
+            .innerRadius(radius * 0.4)
+            .outerRadius(radius - 10);
+
+        var arcHover = d3.arc()
+            .innerRadius(radius * 0.4)
+            .outerRadius(radius);
+
+        var tooltip = document.createElement('div');
+        tooltip.className = 'wp-plugin-line-tooltip';
+        container.appendChild(tooltip);
+
+        function showTooltip(event, datum) {
+            var rect = container.getBoundingClientRect();
+            tooltip.innerHTML = '<strong>' + datum.data.name + '</strong><br>' + datum.data.count + ' posts';
+            tooltip.style.left = (event.clientX - rect.left + 20) + 'px';
+            tooltip.style.top = (event.clientY - rect.top - 10) + 'px';
+            tooltip.style.opacity = 1;
+        }
+
+        function hideTooltip() {
+            tooltip.style.opacity = 0;
+        }
+
+        var path = svg.selectAll('path')
+            .data(pie(data))
+            .enter()
+            .append('path')
+            .attr('d', arc)
+            .attr('fill', function (d) { return color(d.data.name); })
+            .attr('stroke', '#fff')
+            .attr('stroke-width', 2)
+            .style('cursor', 'pointer')
+            .on('mouseenter', function (event, d) {
+                d3.select(this).transition().duration(150).attr('d', arcHover);
+                showTooltip(event, d);
+            })
+            .on('mouseleave', function () {
+                d3.select(this).transition().duration(150).attr('d', arc);
+                hideTooltip();
+            });
+
+        var legend = document.createElement('div');
+        legend.className = 'wp-plugin-line-legend';
+        legend.style.flexWrap = 'wrap';
+        legend.innerHTML = data.map(function (datum) {
+            return '<span><span class="dot" style="background:' + color(datum.name) + ';"></span>' + datum.name + '</span>';
+        }).join('');
+        container.appendChild(legend);
+    }
             containerId: 'wp-plugin-tag-timeline',
             dataKey: 'tagTimeline',
             emptyMessage: 'No tag analytics data available.',

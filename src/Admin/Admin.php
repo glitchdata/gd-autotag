@@ -28,9 +28,11 @@ class Admin
 
         $current_page = isset($_GET['page']) ? sanitize_key($_GET['page']) : '';
         if ($current_page === 'wp-plugin') {
+            $tagStats = $this->get_tag_usage_stats(8);
             wp_localize_script('wp-plugin-admin', 'wpPluginDashboardData', [
                 'postTimeline' => $this->get_monthly_post_stats(12),
                 'tagTimeline' => $this->get_monthly_tag_stats(12),
+                'topTags' => $tagStats['top_tags'] ?? [],
             ]);
         }
     }
@@ -842,15 +844,11 @@ class Admin
                         </div>
 
                         <div class="card">
-                            <h2>Tag Analytics (Last 12 Months)</h2>
-                            <p style="margin-top: -10px; color: #666;">Tracks how many tag assignments and distinct tags were applied each month.</p>
-                            <div id="wp-plugin-tag-timeline" class="wp-plugin-line-chart" aria-label="Tag usage over time">
+                            <h2>Tag Summary</h2>
+                            <p style="margin-top: -10px; color: #666;">Review tag coverage, trends, and the tags appearing most across your posts.</p>
+                            <div id="wp-plugin-tag-timeline" class="wp-plugin-line-chart" aria-label="Tag usage over time" style="margin-top: 12px;">
                                 <noscript>Enable JavaScript to view the tag analytics line chart.</noscript>
                             </div>
-                        </div>
-
-                        <div class="card">
-                            <h2>Tag Summary</h2>
                             <div class="wp-plugin-summary-grid">
                                 <div class="summary-item">
                                     <span class="label">Avg Tags / Tagged Post</span>
@@ -867,6 +865,8 @@ class Admin
                             </div>
 
                             <h3 style="margin-top: 20px;">Top Tags</h3>
+                            <div class="wp-plugin-tag-analytics">
+                                <div class="wp-plugin-tag-analytics__list">
                             <?php if (!empty($tagStats['top_tags'])): ?>
                                 <ul class="wp-plugin-top-tags-list">
                                     <?php foreach ($tagStats['top_tags'] as $tag): ?>
@@ -879,6 +879,13 @@ class Admin
                             <?php else: ?>
                                 <p>No tag data available yet.</p>
                             <?php endif; ?>
+                                </div>
+                                <div class="wp-plugin-tag-analytics__chart">
+                                    <div id="wp-plugin-top-tags-chart" class="wp-plugin-pie-chart" aria-label="Top tags pie chart">
+                                        <noscript>Enable JavaScript to view the top tags pie chart.</noscript>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="card">
