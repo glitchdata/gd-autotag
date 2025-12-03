@@ -36,7 +36,7 @@ class Admin
 
     public function add_action_links($links): array
     {
-        $settings_link = '<a href="' . esc_url(admin_url('admin.php?page=wp-plugin-settings')) . '">Settings</a>';
+        $settings_link = '<a href="' . esc_url(admin_url('admin.php?page=wp-plugin&tab=settings')) . '">Settings</a>';
         $dashboard_link = '<a href="' . esc_url(admin_url('admin.php?page=wp-plugin')) . '">Dashboard</a>';
 
         array_unshift($links, $settings_link, $dashboard_link);
