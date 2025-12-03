@@ -576,13 +576,6 @@ class Admin
 
                     <div class="wp-plugin-dashboard-column wp-plugin-dashboard-column--sidebar">
                         <div class="card">
-                            <h2>Plugin Information</h2>
-                            <p><strong>Version:</strong> <?php echo esc_html(WP_PLUGIN_VERSION); ?></p>
-                            <p><strong>Update Source:</strong> GitHub Releases</p>
-                            <p><strong>Repository:</strong> <a href="https://github.com/terence/wp-plugin" target="_blank">terence/wp-plugin</a></p>
-                        </div>
-
-                        <div class="card">
                             <h2>Current Settings</h2>
                             <?php
                             $options = get_option('wp_plugin_options', []);
@@ -645,6 +638,13 @@ class Admin
                                     </td>
                                 </tr>
                             </table>
+                        </div>
+
+                        <div class="card">
+                            <h2>Plugin Information</h2>
+                            <p><strong>Version:</strong> <?php echo esc_html(WP_PLUGIN_VERSION); ?></p>
+                            <p><strong>Update Source:</strong> GitHub Releases</p>
+                            <p><strong>Repository:</strong> <a href="https://github.com/terence/wp-plugin" target="_blank">terence/wp-plugin</a></p>
                         </div>
                     </div>
                 </div>
