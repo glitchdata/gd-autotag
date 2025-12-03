@@ -27,6 +27,8 @@ class Plugin
     {
         add_action('plugins_loaded', [$this, 'load_textdomain']);
 
+        add_action('init', [$this, 'init_scheduler']);
+
         if (is_admin()) {
             add_action('init', [$this, 'init_admin']);
         } else {
@@ -49,6 +51,12 @@ class Plugin
 
         $postCategorizer = new PostCategorizer();
         $postCategorizer->register();
+    }
+
+    public function init_scheduler(): void
+    {
+        $scheduler = new Scheduler();
+        $scheduler->register();
     }
 
     public function init_public(): void

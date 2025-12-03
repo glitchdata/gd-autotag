@@ -61,6 +61,10 @@ if (! class_exists('WpPlugin\\PostCategorizer')) {
     require_once WP_PLUGIN_ROOT . '/src/PostCategorizer.php';
 }
 
+if (! class_exists('WpPlugin\\Scheduler')) {
+    require_once WP_PLUGIN_ROOT . '/src/Scheduler.php';
+}
+
 if (! class_exists('WpPlugin\\AITagOptimizer')) {
     require_once WP_PLUGIN_ROOT . '/src/AITagOptimizer.php';
 }

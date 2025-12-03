@@ -182,6 +182,46 @@ class Admin
             'wp_plugin_auto_categories_section'
         );
         
+        // Schedule Settings Section (Settings tab)
+        add_settings_section(
+            'wp_plugin_schedule_section',
+            'Schedule',
+            [$this, 'render_schedule_section'],
+            'wp-plugin-settings'
+        );
+
+        add_settings_field(
+            'schedule_enabled',
+            'Enable Schedule',
+            [$this, 'render_schedule_toggle_field'],
+            'wp-plugin-settings',
+            'wp_plugin_schedule_section'
+        );
+
+        add_settings_field(
+            'schedule_frequency',
+            'Run Frequency',
+            [$this, 'render_schedule_frequency_field'],
+            'wp-plugin-settings',
+            'wp_plugin_schedule_section'
+        );
+
+        add_settings_field(
+            'schedule_time',
+            'Preferred Run Time',
+            [$this, 'render_schedule_time_field'],
+            'wp-plugin-settings',
+            'wp_plugin_schedule_section'
+        );
+
+        add_settings_field(
+            'schedule_batch_size',
+            'Posts Per Run',
+            [$this, 'render_schedule_batch_size_field'],
+            'wp-plugin-settings',
+            'wp_plugin_schedule_section'
+        );
+
         // Advanced Settings Section
         add_settings_section(
             'wp_plugin_advanced_section',
@@ -315,6 +355,37 @@ class Admin
             $sanitized['ai_api_key'] = sanitize_text_field($input['ai_api_key']);
         }
 
+        if (isset($input['schedule_enabled'])) {
+            $sanitized['schedule_enabled'] = (bool) $input['schedule_enabled'];
+        }
+
+        if (isset($input['schedule_frequency'])) {
+            $frequency = sanitize_text_field($input['schedule_frequency']);
+            $allowed_freqs = ['hourly', 'twicedaily', 'daily'];
+            if (!in_array($frequency, $allowed_freqs, true)) {
+                $frequency = 'daily';
+            }
+            $sanitized['schedule_frequency'] = $frequency;
+        }
+
+        if (isset($input['schedule_time'])) {
+            $time = sanitize_text_field($input['schedule_time']);
+            if (!preg_match('/^\d{2}:\d{2}$/', $time)) {
+                $time = '02:00';
+            }
+            $sanitized['schedule_time'] = $time;
+        }
+
+        if (isset($input['schedule_batch_size'])) {
+            $batch = absint($input['schedule_batch_size']);
+            if ($batch < 1) {
+                $batch = 5;
+            } elseif ($batch > 50) {
+                $batch = 50;
+            }
+            $sanitized['schedule_batch_size'] = $batch;
+        }
+
         if (isset($input['auto_category_enabled'])) {
             $sanitized['auto_category_enabled'] = (bool) $input['auto_category_enabled'];
         }
@@ -362,6 +433,15 @@ class Admin
     public function render_auto_categories_section(array $section = []): void
     {
         echo '<p>Configure how posts inherit categories automatically based on tags and content.</p>';
+    }
+
+    public function render_schedule_section(array $section = []): void
+    {
+        $last_run = get_option('wp_plugin_schedule_last_run');
+        $last_run_text = $last_run
+            ? sprintf('Last run %s ago', human_time_diff($last_run, time()))
+            : 'Not run yet';
+        echo '<p>Automatically run tagging/categorization tasks on a schedule. ' . esc_html($last_run_text) . '.</p>';
     }
 
     public function render_advanced_section(array $section = []): void
@@ -432,6 +512,54 @@ class Admin
             • <strong>Row Action:</strong> "Generate Tags" link on individual posts in the Posts list<br>
             • <strong>Meta Box:</strong> Tag generator in the post editor sidebar
         </p>
+        <?php
+    }
+
+    public function render_schedule_toggle_field(): void
+    {
+        $options = get_option('wp_plugin_options', []);
+        $enabled = isset($options['schedule_enabled']) ? (bool) $options['schedule_enabled'] : false;
+        ?>
+        <label class="wp-plugin-toggle-switch">
+            <input type="checkbox" name="wp_plugin_options[schedule_enabled]" value="1" <?php checked($enabled, true); ?> />
+            <span class="wp-plugin-toggle-slider"></span>
+        </label>
+        <span class="wp-plugin-setting-label">Run GD AutoTag automatically</span>
+        <p class="description">When enabled, WordPress cron will execute the tagging/categorization jobs at the frequency you choose.</p>
+        <?php
+    }
+
+    public function render_schedule_frequency_field(): void
+    {
+        $options = get_option('wp_plugin_options', []);
+        $frequency = isset($options['schedule_frequency']) ? $options['schedule_frequency'] : 'daily';
+        ?>
+        <select name="wp_plugin_options[schedule_frequency]">
+            <option value="hourly" <?php selected($frequency, 'hourly'); ?>>Hourly</option>
+            <option value="twicedaily" <?php selected($frequency, 'twicedaily'); ?>>Twice Daily</option>
+            <option value="daily" <?php selected($frequency, 'daily'); ?>>Daily</option>
+        </select>
+        <p class="description">Choose how often to process posts automatically.</p>
+        <?php
+    }
+
+    public function render_schedule_time_field(): void
+    {
+        $options = get_option('wp_plugin_options', []);
+        $time = isset($options['schedule_time']) ? $options['schedule_time'] : '02:00';
+        ?>
+        <input type="time" name="wp_plugin_options[schedule_time]" value="<?php echo esc_attr($time); ?>" />
+        <p class="description">Used for daily schedules to specify the preferred start time (site timezone).</p>
+        <?php
+    }
+
+    public function render_schedule_batch_size_field(): void
+    {
+        $options = get_option('wp_plugin_options', []);
+        $batch = isset($options['schedule_batch_size']) ? $options['schedule_batch_size'] : 5;
+        ?>
+        <input type="number" name="wp_plugin_options[schedule_batch_size]" value="<?php echo esc_attr($batch); ?>" min="1" max="50" step="1" />
+        <p class="description">How many posts to attempt per run. Larger batches may impact performance.</p>
         <?php
     }
 

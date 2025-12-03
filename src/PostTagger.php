@@ -226,7 +226,7 @@ class PostTagger
         }
     }
 
-    private function generate_tags_for_post(int $post_id): bool
+    public function generate_tags_for_post(int $post_id): bool
     {
         $post = get_post($post_id);
         
