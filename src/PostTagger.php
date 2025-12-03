@@ -259,12 +259,10 @@ class PostTagger
 
     private function extract_tags($post): array
     {
-        $text = $post->post_title . ' ' . strip_tags($post->post_content);
-        
         // Get plugin options for exclusion list
         $options = get_option('wp_plugin_options', []);
         $exclusion_list = isset($options['tag_exclusion_list']) ? $options['tag_exclusion_list'] : '';
-        
+
         // Build common words list
         $common_words = [
             'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
@@ -273,36 +271,41 @@ class PostTagger
             'would', 'could', 'should', 'may', 'might', 'must', 'can', 'this',
             'that', 'these', 'those', 'i', 'you', 'he', 'she', 'it', 'we', 'they'
         ];
-        
+
         // Add custom exclusion words
         if (!empty($exclusion_list)) {
             $custom_exclusions = array_filter(
                 array_map('trim', explode("\n", strtolower($exclusion_list))),
-                function($word) {
-                    return !empty($word);
+                static function ($word) {
+                    return $word !== '';
                 }
             );
             $common_words = array_merge($common_words, $custom_exclusions);
         }
-        
-        // Make exclusion list unique and lowercase
-        $common_words = array_unique(array_map('strtolower', $common_words));
-        
-        // Extract words (2+ characters)
-        preg_match_all('/\b[a-z]{2,}\b/i', $text, $matches);
-        $words = $matches[0];
-        
-        // Count word frequency
-        $word_freq = array_count_values(array_map('strtolower', $words));
-        
-        // Remove common words and exclusion list
-        foreach ($common_words as $common) {
-            unset($word_freq[$common]);
+
+        // Use associative array for faster lookups
+        $exclusions = array_fill_keys(array_map('strtolower', array_unique($common_words)), true);
+
+        $title_words = $this->tokenize_text($post->post_title);
+        $content_text = strip_tags($post->post_content);
+        $content_words = $this->tokenize_text($content_text);
+        $intro_words = array_slice($content_words, 0, 120);
+
+        $word_scores = [];
+
+        // Base relevance from entire content
+        $this->accumulate_scores($word_scores, $content_words, 1.0, $exclusions);
+        // Title words carry stronger intent
+        $this->accumulate_scores($word_scores, $title_words, 3.0, $exclusions);
+        // Intro/summary paragraphs provide topical cues
+        $this->accumulate_scores($word_scores, $intro_words, 1.5, $exclusions);
+
+        if (empty($word_scores)) {
+            return [];
         }
-        
-        // Sort by frequency
-        arsort($word_freq);
-        
+
+        arsort($word_scores);
+
         // Get max tags setting (default 10)
         $max_tags = isset($options['max_tags_per_post']) ? intval($options['max_tags_per_post']) : 10;
         if ($max_tags < 1) {
@@ -310,13 +313,45 @@ class PostTagger
         } elseif ($max_tags > 50) {
             $max_tags = 50;
         }
-        
-        // Get top N words based on setting
-        $tags = array_slice(array_keys($word_freq), 0, $max_tags);
-        
-        // Capitalize first letter
-        $tags = array_map('ucfirst', $tags);
+
+        // Get top N words based on weighted scores
+        $tags = array_slice(array_keys($word_scores), 0, $max_tags);
+
+        // Capitalize first letter for presentation
+        $tags = array_map(static function ($tag) {
+            return ucfirst($tag);
+        }, $tags);
         
         return $tags;
+    }
+
+    private function tokenize_text(string $text): array
+    {
+        if ($text === '') {
+            return [];
+        }
+
+        preg_match_all('/\b[a-z]{2,}\b/i', $text, $matches);
+        if (empty($matches[0])) {
+            return [];
+        }
+
+        return array_map('strtolower', $matches[0]);
+    }
+
+    private function accumulate_scores(array &$scores, array $words, float $weight, array $exclusions): void
+    {
+        if ($weight <= 0 || empty($words)) {
+            return;
+        }
+
+        $counts = array_count_values($words);
+        foreach ($counts as $word => $count) {
+            if (isset($exclusions[$word])) {
+                continue;
+            }
+
+            $scores[$word] = ($scores[$word] ?? 0) + ($count * $weight);
+        }
     }
 }
