@@ -57,12 +57,21 @@ class Admin
             : plugin_dir_url($this->file) . 'assets/img/glitchdata_logo1.png';
 
         add_menu_page(
-            'DashGD AutoTag',       // Page title
+            'GD AutoTag Dashboard',       // Page title
             'GD AutoTag',       // Menu title
             'manage_options',
             'wp-plugin',
             [$this, 'render_admin_page'],
             $icon_url
+        );
+
+        add_submenu_page(
+            'wp-plugin',
+            'Dashboard',
+            'Dashboard',
+            'manage_options',
+            'wp-plugin',
+            [$this, 'render_admin_page']
         );
         
         add_submenu_page(
