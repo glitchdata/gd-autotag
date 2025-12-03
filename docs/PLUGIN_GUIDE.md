@@ -1,0 +1,249 @@
+# Plugin Guide
+
+Detailed documentation for the GD AutoTag WordPress plugin. Use this guide for in-depth information about dashboard widgets, settings, tagging automation, and advanced AI-powered features.
+
+## Plugin Features
+
+### Admin Dashboard
+
+The plugin provides a comprehensive admin dashboard accessible from the WordPress admin menu:
+
+- **Plugin Information**: Version, update source, and repository details
+- **Current Settings**: Quick view of all configured settings
+- **Posts Summary**: Overview of post counts and tag coverage with visual bar chart
+- **Update Status**: Check for plugin updates manually or view automatic check status
+
+### Settings
+
+Navigate to **Settings** tab to configure:
+
+- **Enable Feature**: Toggle the main plugin feature on/off
+- **API Key**: Configure API key for external services
+- **Auto-Tag Posts**: Enable/disable automatic tag generation functionality
+- **Debug Mode**: Enable debug logging for troubleshooting
+- **Tag Exclusion List**: Define words that should never be used as tags (one per line)
+
+All settings are stored in the WordPress options table under `wp_plugin_options`.
+
+#### API Key Configuration
+
+The plugin validates API keys to ensure they meet security requirements.
+
+**Format Requirements:**
+- Minimum length: 20 characters
+- Allowed characters: Letters (a-z, A-Z), numbers (0-9), dashes (-), underscores (_)
+- No spaces or special characters
+
+**Example valid API key:**
+```
+my-api-key-1234567890abcdef_xyz
+```
+
+**Validation:**
+- Format validation occurs when saving settings
+- Invalid keys display error messages with specific requirements
+- Dashboard shows API key status: "Configured & Valid", "Invalid Format", or "Not set"
+- Character count displayed for valid keys
+
+**External License Verification:**
+
+The plugin automatically verifies API keys against an external license server when saving settings.
+
+**License Server Integration:**
+- Endpoint URL can be configured via filter: `wp_plugin_license_server_url`
+- Default endpoint: `https://api.example.com/v1/verify-license`
+- Verification includes site URL and plugin version
+- Timeout: 15 seconds
+
+**License Response Data:**
+- License type (standard, premium, enterprise, etc.)
+- Expiration date
+- Customer name
+- Maximum allowed sites
+
+**Dashboard Display:**
+- Shows license status: "Active License", "License Verification Failed", or "Not Verified"
+- Displays license type and expiration date
+- Shows last verification timestamp
+- Customer name if provided by license server
+
+**Configuring License Server:**
+
+Add to your theme's `functions.php` or custom plugin:
+
+```php
+add_filter('wp_plugin_license_server_url', function($url) {
+    return 'https://yourdomain.com/api/verify-license';
+});
+```
+
+**License Server API Format:**
+
+Request:
+```json
+{
+  "api_key": "your-api-key-here",
+  "site_url": "https://example.com",
+  "plugin_version": "0.1.1"
+}
+```
+
+Response (Success):
+```json
+{
+  "valid": true,
+  "license_type": "premium",
+  "expires_at": "2026-12-31",
+  "customer_name": "John Doe",
+  "max_sites": 5
+}
+```
+
+Response (Failure):
+```json
+{
+  "valid": false,
+  "message": "Invalid license key or expired"
+}
+```
+
+**Storage:**
+- Option name: `wp_plugin_options`
+- Field key: `api_key`
+- License status: `api_key_license_status`
+- License data: `api_key_license_data`
+- Last checked: `api_key_last_checked`
+- Database: WordPress `wp_options` table (sanitized and encrypted in transit)
+
+### Automatic Tag Generation
+
+The plugin can automatically generate tags for posts based on content analysis:
+
+#### Features:
+- **Bulk Action**: Select multiple posts and use "Generate Tags" bulk action from the Posts list
+- **Individual Posts**: Click "Generate Tags" link in post row actions
+- **Post Editor Meta Box**: Generate tags directly from the post editor sidebar
+- **Smart Filtering**: Automatically excludes common words and custom exclusion list
+- **Frequency Analysis**: Identifies top words from title and content
+- **AI Optimization**: Optional AI-powered tag refinement and optimization
+
+#### AI-Powered Tag Optimization
+
+Enable AI integration to enhance tag quality with semantic understanding and SEO optimization.
+
+**Supported AI Providers:**
+- **OpenAI**: GPT-3.5 Turbo or GPT-4 models
+- **Anthropic**: Claude 3 Haiku or Sonnet models
+- **Google**: Gemini Pro model
+- **Custom**: Configure your own AI endpoint
+
+**AI Features:**
+- Contextual understanding of post content
+- Semantic similarity analysis
+- Industry-specific tag suggestions
+- Duplicate and similar tag consolidation
+- SEO-focused refinement
+- Intelligent tag prioritization
+
+**Configuration:**
+
+1. Enable "AI Tag Optimization" under the Advanced settings tab
+2. Select your AI provider (OpenAI, Anthropic, Google, or Custom)
+3. Enter your provider's API key
+4. Configure maximum tags per post (1-50)
+
+**Getting API Keys:**
+- OpenAI: [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+- Anthropic: [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys)
+- Google: [makersuite.google.com/app/apikey](https://makersuite.google.com/app/apikey)
+
+**Custom AI Endpoint:**
+
+For custom AI implementations, configure the endpoint via filter:
+
+```php
+add_filter('wp_plugin_custom_ai_endpoint', function($endpoint) {
+    return 'https://your-ai-service.com/api/optimize-tags';
+});
+
+// Optionally customize headers
+add_filter('wp_plugin_custom_ai_headers', function($headers) {
+    return [
+        'Content-Type' => 'application/json',
+        'X-API-Key' => 'your-api-key',
+    ];
+});
+
+// Customize request body format
+add_filter('wp_plugin_custom_ai_body', function($body, $tags, $title, $content) {
+    return json_encode([
+        'tags' => $tags,
+        'title' => $title,
+        'content' => substr($content, 0, 500),
+        'action' => 'optimize',
+    ]);
+}, 10, 4);
+
+// Parse custom response format
+add_filter('wp_plugin_custom_ai_parse_response', function($tags, $response) {
+    return $response['optimized_tags'] ?? $tags;
+}, 10, 2);
+```
+
+**AI Model Customization:**
+
+Override default AI models using filters:
+
+```php
+// Use GPT-4 instead of GPT-3.5
+add_filter('wp_plugin_openai_model', function($model) {
+    return 'gpt-4';
+});
+
+// Use Claude 3 Sonnet instead of Haiku
+add_filter('wp_plugin_anthropic_model', function($model) {
+    return 'claude-3-sonnet-20240229';
+});
+
+// Use specific Gemini model
+add_filter('wp_plugin_google_model', function($model) {
+    return 'gemini-1.5-pro';
+});
+```
+
+**Storage:**
+- AI optimization enabled: `wp_plugin_options['ai_optimization_enabled']`
+- AI provider: `wp_plugin_options['ai_provider']`
+- AI API key: `wp_plugin_options['ai_api_key']` (stored securely)
+
+#### Tag Exclusion List:
+Located in **Auto Tagging Settings**, this feature allows you to specify words that should never be used as tags. The system automatically excludes common words like "the", "and", "or", etc., plus any custom words you add.
+
+**Storage Location:**
+- Option name: `wp_plugin_options`
+- Field key: `tag_exclusion_list`
+- Format: Plain text, one word per line
+- Database: WordPress `wp_options` table
+
+Example exclusion list:
+```
+wordpress
+plugin
+website
+content
+page
+article
+```
+
+### Posts Summary Dashboard
+
+The dashboard displays comprehensive statistics about your posts:
+
+- Total Posts (all statuses)
+- Published Posts count
+- Posts with Tags (count and percentage)
+- Posts without Tags (highlighted if any exist)
+- Total Tags in system
+- Visual bar chart showing tag coverage percentage
+
+The bar chart provides an at-a-glance view of how well your content is tagged, with green for tagged posts and orange for untagged posts.
