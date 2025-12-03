@@ -57,7 +57,7 @@ class Admin
             : plugin_dir_url($this->file) . 'assets/img/glitchdata_logo1.png';
 
         add_menu_page(
-            'GD AutoTag',       // Page title
+            'DashGD AutoTag',       // Page title
             'GD AutoTag',       // Menu title
             'manage_options',
             'wp-plugin',
