@@ -1,30 +1,31 @@
 (function () {
-    function renderPostTimeline() {
+    function renderLineChart(config) {
         if (typeof d3 === 'undefined' || typeof wpPluginDashboardData === 'undefined') {
             return;
         }
 
-        var container = document.getElementById('wp-plugin-post-timeline');
+        var container = document.getElementById(config.containerId);
         if (!container) {
             return;
         }
 
-        var data = wpPluginDashboardData.postTimeline || [];
+        var data = wpPluginDashboardData[config.dataKey] || [];
         if (!data.length) {
-            container.innerHTML = '<p style="padding: 12px;">No post analytics data available.</p>';
+            container.innerHTML = '<p style="padding: 12px;">' + (config.emptyMessage || 'No analytics data available.') + '</p>';
             return;
         }
 
-        // Prepare data
         var parseKey = d3.timeParse('%Y-%m');
         var series = data.map(function (d) {
-            return {
+            var parsed = {
                 date: parseKey(d.key),
                 label: d.label,
-                year: d.year,
-                total: +d.total,
-                tagged: +d.tagged
+                year: d.year
             };
+            config.series.forEach(function (s) {
+                parsed[s.key] = +d[s.key];
+            });
+            return parsed;
         }).filter(function (d) { return d.date instanceof Date && !isNaN(d.date); });
 
         if (!series.length) {
@@ -49,20 +50,14 @@
             .domain(d3.extent(series, function (d) { return d.date; }))
             .range([0, width]);
 
+        var yMax = d3.max(series, function (d) {
+            return d3.max(config.series, function (s) { return d[s.key]; });
+        }) || 1;
+
         var y = d3.scaleLinear()
-            .domain([0, d3.max(series, function (d) { return d.total; }) || 1])
+            .domain([0, yMax])
             .nice()
             .range([height, 0]);
-
-        var lineTotal = d3.line()
-            .curve(d3.curveMonotoneX)
-            .x(function (d) { return x(d.date); })
-            .y(function (d) { return y(d.total); });
-
-        var lineTagged = d3.line()
-            .curve(d3.curveMonotoneX)
-            .x(function (d) { return x(d.date); })
-            .y(function (d) { return y(d.tagged); });
 
         // Axes
         svg.append('g')
@@ -76,20 +71,19 @@
             .selectAll('text')
             .style('font-size', '11px');
 
-        // Lines
-        svg.append('path')
-            .datum(series)
-            .attr('fill', 'none')
-            .attr('stroke', '#1d6fa5')
-            .attr('stroke-width', 2)
-            .attr('d', lineTotal);
+        var line = d3.line()
+            .curve(d3.curveMonotoneX)
+            .x(function (d) { return x(d.date); })
+            .y(function (d) { return y(d.value); });
 
-        svg.append('path')
-            .datum(series)
-            .attr('fill', 'none')
-            .attr('stroke', '#1fb141')
-            .attr('stroke-width', 2)
-            .attr('d', lineTagged);
+        config.series.forEach(function (serie) {
+            svg.append('path')
+                .datum(series.map(function (d) { return { date: d.date, value: d[serie.key] }; }))
+                .attr('fill', 'none')
+                .attr('stroke', serie.color)
+                .attr('stroke-width', 2)
+                .attr('d', line);
+        });
 
         var tooltip = document.createElement('div');
         tooltip.className = 'wp-plugin-line-tooltip';
@@ -97,9 +91,11 @@
 
         function showTooltip(event, datum) {
             var rect = container.getBoundingClientRect();
-            tooltip.innerHTML = '<strong>' + datum.label + ' ' + datum.year + '</strong><br>' +
-                'Total: ' + datum.total + '<br>' +
-                'Tagged: ' + datum.tagged;
+            var inner = '<strong>' + datum.label + ' ' + datum.year + '</strong><br>';
+            config.series.forEach(function (serie) {
+                inner += serie.label + ': ' + datum[serie.key] + '<br>';
+            });
+            tooltip.innerHTML = inner;
             tooltip.style.left = (event.clientX - rect.left + 20) + 'px';
             tooltip.style.top = (event.clientY - rect.top - 10) + 'px';
             tooltip.style.opacity = 1;
@@ -109,16 +105,16 @@
             tooltip.style.opacity = 0;
         }
 
-        ['total', 'tagged'].forEach(function (seriesKey, idx) {
-            svg.selectAll('.dot-' + seriesKey)
+        config.series.forEach(function (serie) {
+            svg.selectAll('.dot-' + serie.key)
                 .data(series)
                 .enter()
                 .append('circle')
-                .attr('class', 'dot-' + seriesKey)
+                .attr('class', 'dot-' + serie.key)
                 .attr('cx', function (d) { return x(d.date); })
-                .attr('cy', function (d) { return y(d[seriesKey]); })
+                .attr('cy', function (d) { return y(d[serie.key]); })
                 .attr('r', 3.5)
-                .attr('fill', idx === 0 ? '#1d6fa5' : '#1fb141')
+                .attr('fill', serie.color)
                 .attr('stroke', '#fff')
                 .attr('stroke-width', 1)
                 .style('cursor', 'pointer')
@@ -128,10 +124,31 @@
 
         var legend = document.createElement('div');
         legend.className = 'wp-plugin-line-legend';
-        legend.innerHTML = '<span><span class="dot total"></span>Total Posts</span>' +
-            '<span><span class="dot tagged"></span>Tagged Posts</span>';
+        legend.innerHTML = config.series.map(function (serie) {
+            return '<span><span class="dot" style="background: ' + serie.color + ';"></span>' + serie.label + '</span>';
+        }).join('');
         container.appendChild(legend);
     }
 
-    document.addEventListener('DOMContentLoaded', renderPostTimeline);
+    document.addEventListener('DOMContentLoaded', function () {
+        renderLineChart({
+            containerId: 'wp-plugin-post-timeline',
+            dataKey: 'postTimeline',
+            emptyMessage: 'No post analytics data available.',
+            series: [
+                { key: 'total', label: 'Total Posts', color: '#1d6fa5' },
+                { key: 'tagged', label: 'Tagged Posts', color: '#1fb141' }
+            ]
+        });
+
+        renderLineChart({
+            containerId: 'wp-plugin-tag-timeline',
+            dataKey: 'tagTimeline',
+            emptyMessage: 'No tag analytics data available.',
+            series: [
+                { key: 'assignments', label: 'Tag Assignments', color: '#7f4bc4' },
+                { key: 'unique_tags', label: 'Unique Tags Applied', color: '#f29f05' }
+            ]
+        });
+    });
 })();
