@@ -533,8 +533,13 @@ class Admin
         $options = get_option('wp_plugin_options', []);
         $enabled = isset($options['auto_tag_enabled']) ? $options['auto_tag_enabled'] : false;
         ?>
+        <input type="hidden" name="wp_plugin_options[auto_tag_enabled]" value="0" />
         <label class="wp-plugin-toggle-switch">
-            <input type="checkbox" name="wp_plugin_options[auto_tag_enabled]" value="1" <?php checked($enabled, true); ?> />
+            <input type="checkbox"
+                   name="wp_plugin_options[auto_tag_enabled]"
+                   value="1"
+                   data-auto-save="1"
+                   <?php checked($enabled, true); ?> />
             <span class="wp-plugin-toggle-slider"></span>
         </label>
         <span class="wp-plugin-setting-label">Enable automatic tag generation</span>
