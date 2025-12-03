@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name: wp_plugin
+ * Plugin Name: GD AutoTag
  * Plugin URI:  https://github.com/terence/wp-plugin
  * Description: Plugin for Content automation using AI.
  * Version:     0.1.5
