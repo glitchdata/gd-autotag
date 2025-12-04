@@ -235,12 +235,11 @@ page
 article
 ```
 
-### Event-Aware Categorization
+### Event & Trend-Aware Categorization
 
-- The auto-categorizer inspects post titles and content for event-centric keywords (conference, webinar, meetup, etc.) and additional signals such as explicit dates or months.
-- When an event is detected, GD AutoTag automatically tries to assign an "Events"-style category (any category whose name or slug includes hints like `events`, `conference`, `webinar`, `meetup`, and more).
-- Override the detected category via the `gd_autotag_event_category_id` filter if you maintain a custom taxonomy structure.
-- The heuristic requires at least two event keywords or one keyword plus a date indicator to avoid false positives.
+- **Event Detection**: The auto-categorizer inspects post titles and content for event-centric keywords (conference, webinar, meetup, etc.) and additional signals such as explicit dates or months. When triggered, GD AutoTag automatically tries to assign an "Events" category (any term whose name/slug contains hints like `events`, `conference`, `webinar`, `meetup`, and more). Override via the `gd_autotag_event_category_id` filter.
+- **Trend Detection**: Posts discussing market/industry trends, forecasts, or insight reports are identified using keyword + quantitative signal heuristics (e.g., mentions of "2025 outlook", "industry trends", "growth rate 15%", etc.). Matching posts are automatically assigned to the closest "Trends/Insights" category, or you can force your own with the `gd_autotag_trend_category_id` filter.
+- Heuristics require either multiple matching keywords or a keyword plus a corroborating signal (dates for events, quantitative data/periods for trends) to reduce false positives.
 
 ### Posts Summary Dashboard
 

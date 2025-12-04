@@ -31,9 +31,39 @@ class PostCategorizer
         'event', 'events', 'conference', 'webinar', 'workshop', 'meetup', 'festival', 'expo', 'seminar', 'summit'
     ];
 
+    private const TREND_KEYWORDS = [
+        'trend',
+        'trends',
+        'trending',
+        'insight',
+        'insights',
+        'forecast',
+        'forecasts',
+        'prediction',
+        'predictions',
+        'outlook',
+        'future of',
+        'state of',
+        'landscape',
+        'market report',
+        'industry report',
+        'benchmark',
+        'growth rate',
+        'decline rate',
+        'adoption rate',
+        'data shows',
+        'research shows',
+        'statistics'
+    ];
+
+    private const TREND_CATEGORY_HINTS = [
+        'trend', 'trends', 'insight', 'insights', 'forecast', 'report', 'analysis', 'market-intel', 'research'
+    ];
+
     private ?array $categoryTerms = null;
     private ?array $categoryLookup = null;
     private ?int $eventCategoryId = null;
+    private ?int $trendCategoryId = null;
 
     public function register(): void
     {
@@ -285,6 +315,13 @@ class PostCategorizer
             }
         }
 
+        if ($this->is_trend_post($post)) {
+            $trendCategoryId = apply_filters('gd_autotag_trend_category_id', $this->get_trend_category_id(), $post);
+            if (!empty($trendCategoryId)) {
+                $categories[] = (int) $trendCategoryId;
+            }
+        }
+
         if (empty($categories) && !empty($options['auto_category_fallback'])) {
             $categories[] = (int) $options['auto_category_fallback'];
         }
@@ -336,6 +373,45 @@ class PostCategorizer
         }
 
         return $keywordHits >= 2 || ($keywordHits >= 1 && $dateSignal >= 1);
+    }
+
+    private function is_trend_post($post): bool
+    {
+        if (!($post instanceof \WP_Post)) {
+            return false;
+        }
+
+        $text = strtolower($post->post_title . ' ' . wp_strip_all_tags($post->post_content ?? ''));
+        if ($text === '') {
+            return false;
+        }
+
+        $keywordHits = 0;
+        foreach (self::TREND_KEYWORDS as $keyword) {
+            if ($this->textContainsKeyword($text, $keyword)) {
+                $keywordHits++;
+            }
+        }
+
+        if ($keywordHits === 0) {
+            return false;
+        }
+
+        $quantSignal = 0;
+        if (preg_match('/\b\d{1,3}%\b/', $text)) {
+            $quantSignal++;
+        }
+        if (preg_match('/\b(?:q[1-4]|quarter)\s?\d{4}\b/', $text)) {
+            $quantSignal++;
+        }
+        if (preg_match('/\b20\d{2}\b/', $text)) {
+            $quantSignal++;
+        }
+        if (preg_match('/\b(?:yoy|year[- ]over[- ]year|cagr)\b/', $text)) {
+            $quantSignal++;
+        }
+
+        return $keywordHits >= 2 || ($keywordHits >= 1 && $quantSignal >= 1);
     }
 
     private function textContainsKeyword(string $text, string $keyword): bool
@@ -419,6 +495,35 @@ class PostCategorizer
         }
 
         return array_values(array_unique($matches));
+    }
+
+    private function get_trend_category_id(): ?int
+    {
+        if ($this->trendCategoryId !== null) {
+            return $this->trendCategoryId ?: null;
+        }
+
+        foreach ($this->get_category_terms() as $term) {
+            if ($term instanceof \WP_Term && $this->termLooksLikeTrendCategory($term)) {
+                $this->trendCategoryId = (int) $term->term_id;
+                return $this->trendCategoryId;
+            }
+        }
+
+        $this->trendCategoryId = 0;
+        return null;
+    }
+
+    private function termLooksLikeTrendCategory(\WP_Term $term): bool
+    {
+        $haystack = strtolower($term->name . ' ' . $term->slug);
+        foreach (self::TREND_CATEGORY_HINTS as $hint) {
+            if (str_contains($haystack, $hint)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function get_category_terms(): array
