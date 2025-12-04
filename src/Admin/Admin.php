@@ -268,6 +268,46 @@ class Admin
             'gd-autotag-advanced',
             'gd_autotag_advanced_section'
         );
+
+        // Analytics Settings Section
+        add_settings_section(
+            'gd_autotag_analytics_section',
+            'Google Analytics',
+            [$this, 'render_analytics_section'],
+            'gd-autotag-analytics'
+        );
+
+        add_settings_field(
+            'ga_tracking_enabled',
+            'Enable Analytics Tracking',
+            [$this, 'render_ga_tracking_field'],
+            'gd-autotag-analytics',
+            'gd_autotag_analytics_section'
+        );
+
+        add_settings_field(
+            'ga_measurement_id',
+            'Measurement ID',
+            [$this, 'render_ga_measurement_id_field'],
+            'gd-autotag-analytics',
+            'gd_autotag_analytics_section'
+        );
+
+        add_settings_field(
+            'ga_property_id',
+            'Property ID',
+            [$this, 'render_ga_property_id_field'],
+            'gd-autotag-analytics',
+            'gd_autotag_analytics_section'
+        );
+
+        add_settings_field(
+            'ga_api_secret',
+            'API Secret',
+            [$this, 'render_ga_api_secret_field'],
+            'gd-autotag-analytics',
+            'gd_autotag_analytics_section'
+        );
     }
 
     public function sanitize_settings($input)
@@ -431,6 +471,61 @@ class Admin
         if (isset($input['auto_category_fallback'])) {
             $sanitized['auto_category_fallback'] = absint($input['auto_category_fallback']);
         }
+
+        if (isset($input['ga_tracking_enabled'])) {
+            $sanitized['ga_tracking_enabled'] = (bool) $input['ga_tracking_enabled'];
+        }
+
+        if (isset($input['ga_measurement_id'])) {
+            $measurement = strtoupper(sanitize_text_field($input['ga_measurement_id']));
+            if ($measurement === '') {
+                $sanitized['ga_measurement_id'] = '';
+            } elseif (!preg_match('/^G-[A-Z0-9]{4,16}$/', $measurement)) {
+                add_settings_error(
+                    'gd_autotag_messages',
+                    'gd_autotag_ga_measurement_error',
+                    'Measurement ID should look like G-XXXX1234.',
+                    'error'
+                );
+                $sanitized['ga_measurement_id'] = $measurement;
+            } else {
+                $sanitized['ga_measurement_id'] = $measurement;
+            }
+        }
+
+        if (isset($input['ga_property_id'])) {
+            $propertyId = sanitize_text_field($input['ga_property_id']);
+            if ($propertyId === '') {
+                $sanitized['ga_property_id'] = '';
+            } elseif (!preg_match('/^\d{5,20}$/', $propertyId)) {
+                add_settings_error(
+                    'gd_autotag_messages',
+                    'gd_autotag_ga_property_error',
+                    'Property ID should be numeric (e.g., 123456789).',
+                    'error'
+                );
+                $sanitized['ga_property_id'] = $propertyId;
+            } else {
+                $sanitized['ga_property_id'] = $propertyId;
+            }
+        }
+
+        if (isset($input['ga_api_secret'])) {
+            $apiSecret = sanitize_text_field($input['ga_api_secret']);
+            if ($apiSecret === '') {
+                $sanitized['ga_api_secret'] = '';
+            } elseif (!preg_match('/^[A-Za-z0-9_-]{6,128}$/', $apiSecret)) {
+                add_settings_error(
+                    'gd_autotag_messages',
+                    'gd_autotag_ga_api_secret_error',
+                    'API Secret may only include letters, numbers, dashes, and underscores (6-128 chars).',
+                    'error'
+                );
+                $sanitized['ga_api_secret'] = $apiSecret;
+            } else {
+                $sanitized['ga_api_secret'] = $apiSecret;
+            }
+        }
         
         return $sanitized;
     }
@@ -479,6 +574,11 @@ class Admin
     public function render_advanced_section(array $section = []): void
     {
         echo '<p>Advanced options for debugging, AI integrations, and power users.</p>';
+    }
+
+    public function render_analytics_section(array $section = []): void
+    {
+        echo '<p>Connect GD AutoTag insights with Google Analytics 4 to understand how automated tagging impacts traffic.</p>';
     }
 
     public function render_api_key_field(): void
@@ -800,6 +900,82 @@ class Admin
         <?php
     }
 
+    public function render_ga_tracking_field(): void
+    {
+        $options = get_option('gd_autotag_options', []);
+        $enabled = isset($options['ga_tracking_enabled']) ? (bool) $options['ga_tracking_enabled'] : false;
+        $status_id = 'gd-autotag-auto-save-ga-tracking';
+        ?>
+        <input type="hidden" name="gd_autotag_options[ga_tracking_enabled]" value="0" />
+        <label class="gd-autotag-toggle-switch">
+            <input type="checkbox"
+                   name="gd_autotag_options[ga_tracking_enabled]"
+                   value="1"
+                   data-auto-save="1"
+                   data-auto-save-target="<?php echo esc_attr($status_id); ?>"
+                   <?php checked($enabled, true); ?> />
+            <span class="gd-autotag-toggle-slider"></span>
+        </label>
+        <span id="<?php echo esc_attr($status_id); ?>" class="gd-autotag-auto-save-status" aria-live="polite"></span>
+        <span class="gd-autotag-setting-label">Send GD AutoTag metrics to Google Analytics</span>
+        <p class="description">Requires a GA4 Measurement ID and API Secret.</p>
+        <?php
+    }
+
+    public function render_ga_measurement_id_field(): void
+    {
+        $options = get_option('gd_autotag_options', []);
+        $value = isset($options['ga_measurement_id']) ? $options['ga_measurement_id'] : '';
+        $status_id = 'gd-autotag-auto-save-ga-measurement';
+        ?>
+        <input type="text"
+               name="gd_autotag_options[ga_measurement_id]"
+               value="<?php echo esc_attr($value); ?>"
+               class="regular-text"
+               placeholder="G-XXXX1234"
+               data-auto-save="1"
+               data-auto-save-target="<?php echo esc_attr($status_id); ?>" />
+        <span id="<?php echo esc_attr($status_id); ?>" class="gd-autotag-auto-save-status" aria-live="polite"></span>
+        <p class="description">GA4 Measurement ID (found in Admin → Data Streams).</p>
+        <?php
+    }
+
+    public function render_ga_property_id_field(): void
+    {
+        $options = get_option('gd_autotag_options', []);
+        $value = isset($options['ga_property_id']) ? $options['ga_property_id'] : '';
+        $status_id = 'gd-autotag-auto-save-ga-property';
+        ?>
+        <input type="text"
+               name="gd_autotag_options[ga_property_id]"
+               value="<?php echo esc_attr($value); ?>"
+               class="regular-text"
+               placeholder="123456789"
+               data-auto-save="1"
+               data-auto-save-target="<?php echo esc_attr($status_id); ?>" />
+        <span id="<?php echo esc_attr($status_id); ?>" class="gd-autotag-auto-save-status" aria-live="polite"></span>
+        <p class="description">Optional GA4 Property ID for reference in dashboards.</p>
+        <?php
+    }
+
+    public function render_ga_api_secret_field(): void
+    {
+        $options = get_option('gd_autotag_options', []);
+        $value = isset($options['ga_api_secret']) ? $options['ga_api_secret'] : '';
+        $status_id = 'gd-autotag-auto-save-ga-secret';
+        ?>
+        <input type="password"
+               name="gd_autotag_options[ga_api_secret]"
+               value="<?php echo esc_attr($value); ?>"
+               class="regular-text"
+               placeholder="measurement-protocol secret"
+               data-auto-save="1"
+               data-auto-save-target="<?php echo esc_attr($status_id); ?>" />
+        <span id="<?php echo esc_attr($status_id); ?>" class="gd-autotag-auto-save-status" aria-live="polite"></span>
+        <p class="description">Create under Admin → Data Streams → Measurement Protocol API secrets.</p>
+        <?php
+    }
+
     public function render_ai_optimization_field(): void
     {
         $options = get_option('gd_autotag_options', []);
@@ -918,6 +1094,7 @@ class Admin
                 <a href="?page=gd-autotag&tab=auto-tagging" class="nav-tab <?php echo (isset($_GET['tab']) && $_GET['tab'] === 'auto-tagging') ? 'nav-tab-active' : ''; ?>">Auto Tag</a>
                 <a href="?page=gd-autotag&tab=auto-categories" class="nav-tab <?php echo (isset($_GET['tab']) && $_GET['tab'] === 'auto-categories') ? 'nav-tab-active' : ''; ?>">Auto Categories</a>
                 <a href="?page=gd-autotag&tab=advanced" class="nav-tab <?php echo (isset($_GET['tab']) && $_GET['tab'] === 'advanced') ? 'nav-tab-active' : ''; ?>">Advanced</a>
+                <a href="?page=gd-autotag&tab=analytics" class="nav-tab <?php echo (isset($_GET['tab']) && $_GET['tab'] === 'analytics') ? 'nav-tab-active' : ''; ?>">Analytics</a>
             </h2>
 
             <?php
@@ -1169,6 +1346,16 @@ class Admin
                     settings_fields('gd_autotag_settings');
                     do_settings_sections('gd-autotag-advanced');
                     submit_button('Save Advanced Settings');
+                    ?>
+                </form>
+                <?php
+            } elseif ($tab === 'analytics') {
+                ?>
+                <form method="post" action="options.php">
+                    <?php
+                    settings_fields('gd_autotag_settings');
+                    do_settings_sections('gd-autotag-analytics');
+                    submit_button('Save Analytics Settings');
                     ?>
                 </form>
                 <?php

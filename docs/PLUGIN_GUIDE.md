@@ -22,6 +22,7 @@ Navigate to **Settings** tab to configure:
 - **Auto-Tag Posts**: Enable/disable automatic tag generation functionality
 - **Debug Mode**: Enable debug logging for troubleshooting
 - **Tag Exclusion List**: Define words that should never be used as tags (one per line)
+- **Analytics Tab**: Configure Google Analytics 4 tracking (Measurement ID, Property ID, API Secret)
 
 All settings are stored in the WordPress options table under `gd_autotag_options`.
 
@@ -240,6 +241,13 @@ article
 - **Event Detection**: The auto-categorizer inspects post titles and content for event-centric keywords (conference, webinar, meetup, etc.) and additional signals such as explicit dates or months. When triggered, GD AutoTag automatically tries to assign an "Events" category (any term whose name/slug contains hints like `events`, `conference`, `webinar`, `meetup`, and more). Override via the `gd_autotag_event_category_id` filter.
 - **Trend Detection**: Posts discussing market/industry trends, forecasts, or insight reports are identified using keyword + quantitative signal heuristics (e.g., mentions of "2025 outlook", "industry trends", "growth rate 15%", etc.). Matching posts are automatically assigned to the closest "Trends/Insights" category, or you can force your own with the `gd_autotag_trend_category_id` filter.
 - Heuristics require either multiple matching keywords or a keyword plus a corroborating signal (dates for events, quantitative data/periods for trends) to reduce false positives.
+
+### Analytics Integration
+
+- Enable or disable sending GD AutoTag performance events to Google Analytics 4.
+- Provide your GA4 Measurement ID (format `G-XXXX1234`) and optional Property ID for documentation.
+- Store a Measurement Protocol API Secret so server-side events can be authenticated.
+- Override or consume these values in custom code via `gd_autotag_options` (e.g., when you emit custom events from the plugin or theme).
 
 ### Posts Summary Dashboard
 
