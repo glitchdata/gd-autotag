@@ -3,6 +3,16 @@ namespace WpPlugin\Admin;
 
 class Admin
 {
+    private const ADMIN_TABS = [
+        'dashboard' => 'Dashboard',
+        'settings' => 'Settings',
+        'auto-tagging' => 'Auto Tag',
+        'auto-categories' => 'Auto Categories',
+        'advanced' => 'Advanced',
+        'analytics' => 'Analytics',
+        'sitemap' => 'Sitemap',
+    ];
+
     private const DEFAULT_SITEMAP_URI = '/sitemap/sitemap.xml';
 
     private string $file;
@@ -68,26 +78,31 @@ class Admin
             $icon_url
         );
 
-        add_submenu_page(
-            'gd-autotag',
-            'Dashboard',
-            'Dashboard',
-            'manage_options',
-            'gd-autotag',
-            [$this, 'render_admin_page']
-        );
-        
-        add_submenu_page(
-            'gd-autotag',
-            'Settings',
-            'Settings',
-            'manage_options',
-            'gd-autotag&tab=settings',
-            function () {
-                wp_safe_redirect(admin_url('admin.php?page=gd-autotag&tab=settings'));
-                exit;
+        foreach (self::ADMIN_TABS as $slug => $label) {
+            if ($slug === 'dashboard') {
+                add_submenu_page(
+                    'gd-autotag',
+                    $label,
+                    $label,
+                    'manage_options',
+                    'gd-autotag',
+                    [$this, 'render_admin_page']
+                );
+                continue;
             }
-        );
+
+            add_submenu_page(
+                'gd-autotag',
+                $label,
+                $label,
+                'manage_options',
+                'gd-autotag&tab=' . $slug,
+                function () use ($slug) {
+                    wp_safe_redirect(admin_url('admin.php?page=gd-autotag&tab=' . $slug));
+                    exit;
+                }
+            );
+        }
     }
 
     public function register_settings(): void
@@ -1455,6 +1470,10 @@ class Admin
         $sitemapStatus = isset($_GET['gd_autotag_sitemap']) ? sanitize_text_field($_GET['gd_autotag_sitemap']) : '';
         $sitemapNoticeMessage = get_transient('gd_autotag_sitemap_notice');
         $sitemapErrorMessage = get_transient('gd_autotag_sitemap_error');
+        $tab = isset($_GET['tab']) ? sanitize_text_field($_GET['tab']) : 'dashboard';
+        if (!array_key_exists($tab, self::ADMIN_TABS)) {
+            $tab = 'dashboard';
+        }
 
         ?>
         <div class="wrap">
@@ -1490,17 +1509,15 @@ class Admin
             }
             ?>
             <h2 class="nav-tab-wrapper">
-                <a href="?page=gd-autotag&tab=dashboard" class="nav-tab <?php echo (!isset($_GET['tab']) || $_GET['tab'] === 'dashboard') ? 'nav-tab-active' : ''; ?>">Dashboard</a>
-                <a href="?page=gd-autotag&tab=settings" class="nav-tab <?php echo (isset($_GET['tab']) && $_GET['tab'] === 'settings') ? 'nav-tab-active' : ''; ?>">Settings</a>
-                <a href="?page=gd-autotag&tab=auto-tagging" class="nav-tab <?php echo (isset($_GET['tab']) && $_GET['tab'] === 'auto-tagging') ? 'nav-tab-active' : ''; ?>">Auto Tag</a>
-                <a href="?page=gd-autotag&tab=auto-categories" class="nav-tab <?php echo (isset($_GET['tab']) && $_GET['tab'] === 'auto-categories') ? 'nav-tab-active' : ''; ?>">Auto Categories</a>
-                <a href="?page=gd-autotag&tab=advanced" class="nav-tab <?php echo (isset($_GET['tab']) && $_GET['tab'] === 'advanced') ? 'nav-tab-active' : ''; ?>">Advanced</a>
-                <a href="?page=gd-autotag&tab=analytics" class="nav-tab <?php echo (isset($_GET['tab']) && $_GET['tab'] === 'analytics') ? 'nav-tab-active' : ''; ?>">Analytics</a>
-                <a href="?page=gd-autotag&tab=sitemap" class="nav-tab <?php echo (isset($_GET['tab']) && $_GET['tab'] === 'sitemap') ? 'nav-tab-active' : ''; ?>">Sitemap</a>
+                <?php foreach (self::ADMIN_TABS as $slug => $label):
+                    $url = admin_url('admin.php?page=gd-autotag' . ($slug === 'dashboard' ? '' : '&tab=' . $slug));
+                    $isActive = $tab === $slug;
+                    ?>
+                    <a href="<?php echo esc_url($url); ?>" class="nav-tab<?php echo $isActive ? ' nav-tab-active' : ''; ?>"><?php echo esc_html($label); ?></a>
+                <?php endforeach; ?>
             </h2>
 
             <?php
-            $tab = isset($_GET['tab']) ? sanitize_text_field($_GET['tab']) : 'dashboard';
             if ($tab === 'dashboard') {
                 ?>
                 <div class="gd-autotag-dashboard-grid">
