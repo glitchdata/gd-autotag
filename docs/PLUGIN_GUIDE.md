@@ -235,6 +235,13 @@ page
 article
 ```
 
+### Event-Aware Categorization
+
+- The auto-categorizer inspects post titles and content for event-centric keywords (conference, webinar, meetup, etc.) and additional signals such as explicit dates or months.
+- When an event is detected, GD AutoTag automatically tries to assign an "Events"-style category (any category whose name or slug includes hints like `events`, `conference`, `webinar`, `meetup`, and more).
+- Override the detected category via the `gd_autotag_event_category_id` filter if you maintain a custom taxonomy structure.
+- The heuristic requires at least two event keywords or one keyword plus a date indicator to avoid false positives.
+
 ### Posts Summary Dashboard
 
 The dashboard displays comprehensive statistics about your posts:

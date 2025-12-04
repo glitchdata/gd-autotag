@@ -3,8 +3,37 @@ namespace WpPlugin;
 
 class PostCategorizer
 {
+    private const EVENT_KEYWORDS = [
+        'event',
+        'events',
+        'conference',
+        'webinar',
+        'workshop',
+        'summit',
+        'summits',
+        'meetup',
+        'meet-up',
+        'festival',
+        'expo',
+        'seminar',
+        'bootcamp',
+        'boot camp',
+        'keynote',
+        'agenda',
+        'registration',
+        'rsvp',
+        'venue',
+        'doors open',
+        'panel discussion'
+    ];
+
+    private const EVENT_CATEGORY_HINTS = [
+        'event', 'events', 'conference', 'webinar', 'workshop', 'meetup', 'festival', 'expo', 'seminar', 'summit'
+    ];
+
     private ?array $categoryTerms = null;
     private ?array $categoryLookup = null;
+    private ?int $eventCategoryId = null;
 
     public function register(): void
     {
@@ -249,6 +278,13 @@ class PostCategorizer
             }
         }
 
+        if ($this->is_event_post($post)) {
+            $eventCategoryId = apply_filters('gd_autotag_event_category_id', $this->get_event_category_id(), $post);
+            if (!empty($eventCategoryId)) {
+                $categories[] = (int) $eventCategoryId;
+            }
+        }
+
         if (empty($categories) && !empty($options['auto_category_fallback'])) {
             $categories[] = (int) $options['auto_category_fallback'];
         }
@@ -264,6 +300,51 @@ class PostCategorizer
 
         wp_set_post_categories($post_id, $categories, true);
         return true;
+    }
+
+    private function is_event_post($post): bool
+    {
+        if (!($post instanceof \WP_Post)) {
+            return false;
+        }
+
+        $text = strtolower($post->post_title . ' ' . wp_strip_all_tags($post->post_content ?? ''));
+        if ($text === '') {
+            return false;
+        }
+
+        $keywordHits = 0;
+        foreach (self::EVENT_KEYWORDS as $keyword) {
+            if ($this->textContainsKeyword($text, $keyword)) {
+                $keywordHits++;
+            }
+        }
+
+        if ($keywordHits === 0) {
+            return false;
+        }
+
+        $dateSignal = 0;
+        if (preg_match('/\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/', $text)) {
+            $dateSignal++;
+        }
+        if (preg_match('/\b\d{1,2}[\/.-]\d{1,2}(?:[\/.-]\d{2,4})?\b/', $text)) {
+            $dateSignal++;
+        }
+        if (preg_match('/\b20\d{2}\b/', $text)) {
+            $dateSignal++;
+        }
+
+        return $keywordHits >= 2 || ($keywordHits >= 1 && $dateSignal >= 1);
+    }
+
+    private function textContainsKeyword(string $text, string $keyword): bool
+    {
+        if (str_contains($keyword, ' ')) {
+            return str_contains($text, $keyword);
+        }
+
+        return (bool) preg_match('/\b' . preg_quote($keyword, '/') . '\b/', $text);
     }
 
     private function match_categories_by_tags(int $post_id, int $limit): array
@@ -286,6 +367,35 @@ class PostCategorizer
         }
 
         return array_values(array_unique($matches));
+    }
+
+    private function get_event_category_id(): ?int
+    {
+        if ($this->eventCategoryId !== null) {
+            return $this->eventCategoryId ?: null;
+        }
+
+        foreach ($this->get_category_terms() as $term) {
+            if ($term instanceof \WP_Term && $this->termLooksLikeEventCategory($term)) {
+                $this->eventCategoryId = (int) $term->term_id;
+                return $this->eventCategoryId;
+            }
+        }
+
+        $this->eventCategoryId = 0;
+        return null;
+    }
+
+    private function termLooksLikeEventCategory(\WP_Term $term): bool
+    {
+        $haystack = strtolower($term->name . ' ' . $term->slug);
+        foreach (self::EVENT_CATEGORY_HINTS as $hint) {
+            if (str_contains($haystack, $hint)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function match_categories_by_content($post, int $limit): array
