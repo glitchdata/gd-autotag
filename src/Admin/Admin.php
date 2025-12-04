@@ -1857,170 +1857,8 @@ class Admin
         
         $status_code = wp_remote_retrieve_response_code($response);
         $body = wp_remote_retrieve_body($response);
-
-        private function generate_sitemap(): bool
-        {
-            $options = get_option('gd_autotag_options', []);
-            if (empty($options['sitemap_enabled'])) {
-                return false;
-            }
-
-            $urls = $this->collect_sitemap_urls($options);
-            if (empty($urls)) {
-                return false;
-            }
-
-            $paths = $this->get_sitemap_paths();
-            if (empty($paths['file']) || empty($paths['dir'])) {
-                return false;
-            }
-
-            if (!wp_mkdir_p($paths['dir'])) {
-                return false;
-            }
-
-            $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
-            $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
-            foreach ($urls as $entry) {
-                $xml .= "  <url>\n";
-                $xml .= '    <loc>' . esc_url($entry['loc']) . "</loc>\n";
-                if (!empty($entry['lastmod'])) {
-                    $xml .= '    <lastmod>' . esc_html($entry['lastmod']) . "</lastmod>\n";
-                }
-                if (!empty($entry['changefreq'])) {
-                    $xml .= '    <changefreq>' . esc_html($entry['changefreq']) . "</changefreq>\n";
-                }
-                if (!empty($entry['priority'])) {
-                    $xml .= '    <priority>' . esc_html($entry['priority']) . "</priority>\n";
-                }
-                $xml .= "  </url>\n";
-            }
-            $xml .= '</urlset>' . "\n";
-
-            $written = file_put_contents($paths['file'], $xml);
-            if ($written === false) {
-                return false;
-            }
-
-            update_option('gd_autotag_sitemap_last_generated', time());
-
-            if (!empty($options['sitemap_ping_search'])) {
-                $this->ping_search_engines($paths['url']);
-            }
-
-            do_action('gd_autotag_sitemap_generated', $paths['file'], $paths['url']);
-
-            return true;
-        }
-
-        private function collect_sitemap_urls(array $options): array
-        {
-            $urls = [];
-            $changefreq = $options['sitemap_changefreq'] ?? 'weekly';
-
-            $urls[] = [
-                'loc' => home_url('/'),
-                'lastmod' => gmdate('c'),
-                'changefreq' => 'daily',
-                'priority' => '1.0',
-            ];
-
-            $posts = get_posts([
-                'post_type' => 'post',
-                'post_status' => 'publish',
-                'numberposts' => -1,
-                'orderby' => 'date',
-                'order' => 'DESC',
-            ]);
-            foreach ($posts as $post) {
-                $urls[] = [
-                    'loc' => get_permalink($post),
-                    'lastmod' => $this->format_sitemap_lastmod($post),
-                    'changefreq' => $changefreq,
-                    'priority' => '0.7',
-                ];
-            }
-
-            if (!empty($options['sitemap_include_pages'])) {
-                $pages = get_posts([
-                    'post_type' => 'page',
-                    'post_status' => 'publish',
-                    'numberposts' => -1,
-                    'orderby' => 'date',
-                    'order' => 'DESC',
-                ]);
-                foreach ($pages as $page) {
-                    $urls[] = [
-                        'loc' => get_permalink($page),
-                        'lastmod' => $this->format_sitemap_lastmod($page),
-                        'changefreq' => $changefreq,
-                        'priority' => '0.5',
-                    ];
-                }
-            }
-
-            if (!empty($options['sitemap_include_categories'])) {
-                $terms = get_terms([
-                    'taxonomy' => 'category',
-                    'hide_empty' => true,
-                    'number' => 200,
-                ]);
-                foreach ($terms as $term) {
-                    $urls[] = [
-                        'loc' => get_term_link($term),
-                        'lastmod' => gmdate('c'),
-                        'changefreq' => 'weekly',
-                        'priority' => '0.4',
-                    ];
-                }
-            }
-
-            return array_values(array_filter($urls, static function ($entry) {
-                return !empty($entry['loc']);
-            }));
-        }
-
-        private function format_sitemap_lastmod($post): string
-        {
-            $date = $post->post_modified_gmt ?: $post->post_date_gmt ?: $post->post_date;
-            return $date ? gmdate('c', strtotime($date)) : gmdate('c');
-        }
-
-        private function ping_search_engines(?string $sitemapUrl): void
-        {
-            if (empty($sitemapUrl)) {
-                return;
-            }
-
-            $endpoints = [
-                'https://www.google.com/ping?sitemap=' . rawurlencode($sitemapUrl),
-                'https://www.bing.com/ping?sitemap=' . rawurlencode($sitemapUrl),
-            ];
-
-            foreach ($endpoints as $endpoint) {
-                wp_remote_get($endpoint, ['timeout' => 5, 'redirection' => 2]);
-            }
-        }
-
-        private function get_sitemap_paths(): array
-        {
-            $uploads = wp_get_upload_dir();
-            if (!empty($uploads['error'])) {
-                return ['dir' => '', 'file' => '', 'url' => ''];
-            }
-
-            $dir = trailingslashit($uploads['basedir']) . 'gd-autotag';
-            $file = trailingslashit($dir) . 'sitemap.xml';
-            $url = trailingslashit($uploads['baseurl']) . 'gd-autotag/sitemap.xml';
-
-            return [
-                'dir' => $dir,
-                'file' => $file,
-                'url' => $url,
-            ];
-        }
         $data = json_decode($body, true);
-        
+
         // Check response
         if ($status_code === 200 && isset($data['valid']) && $data['valid'] === true) {
             return [
@@ -2034,14 +1872,176 @@ class Admin
                 ],
             ];
         }
-        
+
         // License validation failed
         $error_message = $data['message'] ?? 'Invalid license key';
-        
+
         return [
             'valid' => false,
             'message' => $error_message,
             'data' => [],
+        ];
+    }
+
+    private function generate_sitemap(): bool
+    {
+        $options = get_option('gd_autotag_options', []);
+        if (empty($options['sitemap_enabled'])) {
+            return false;
+        }
+
+        $urls = $this->collect_sitemap_urls($options);
+        if (empty($urls)) {
+            return false;
+        }
+
+        $paths = $this->get_sitemap_paths();
+        if (empty($paths['file']) || empty($paths['dir'])) {
+            return false;
+        }
+
+        if (!wp_mkdir_p($paths['dir'])) {
+            return false;
+        }
+
+        $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+        $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
+        foreach ($urls as $entry) {
+            $xml .= "  <url>\n";
+            $xml .= '    <loc>' . esc_url($entry['loc']) . "</loc>\n";
+            if (!empty($entry['lastmod'])) {
+                $xml .= '    <lastmod>' . esc_html($entry['lastmod']) . "</lastmod>\n";
+            }
+            if (!empty($entry['changefreq'])) {
+                $xml .= '    <changefreq>' . esc_html($entry['changefreq']) . "</changefreq>\n";
+            }
+            if (!empty($entry['priority'])) {
+                $xml .= '    <priority>' . esc_html($entry['priority']) . "</priority>\n";
+            }
+            $xml .= "  </url>\n";
+        }
+        $xml .= '</urlset>' . "\n";
+
+        $written = file_put_contents($paths['file'], $xml);
+        if ($written === false) {
+            return false;
+        }
+
+        update_option('gd_autotag_sitemap_last_generated', time());
+
+        if (!empty($options['sitemap_ping_search'])) {
+            $this->ping_search_engines($paths['url']);
+        }
+
+        do_action('gd_autotag_sitemap_generated', $paths['file'], $paths['url']);
+
+        return true;
+    }
+
+    private function collect_sitemap_urls(array $options): array
+    {
+        $urls = [];
+        $changefreq = $options['sitemap_changefreq'] ?? 'weekly';
+
+        $urls[] = [
+            'loc' => home_url('/'),
+            'lastmod' => gmdate('c'),
+            'changefreq' => 'daily',
+            'priority' => '1.0',
+        ];
+
+        $posts = get_posts([
+            'post_type' => 'post',
+            'post_status' => 'publish',
+            'numberposts' => -1,
+            'orderby' => 'date',
+            'order' => 'DESC',
+        ]);
+        foreach ($posts as $post) {
+            $urls[] = [
+                'loc' => get_permalink($post),
+                'lastmod' => $this->format_sitemap_lastmod($post),
+                'changefreq' => $changefreq,
+                'priority' => '0.7',
+            ];
+        }
+
+        if (!empty($options['sitemap_include_pages'])) {
+            $pages = get_posts([
+                'post_type' => 'page',
+                'post_status' => 'publish',
+                'numberposts' => -1,
+                'orderby' => 'date',
+                'order' => 'DESC',
+            ]);
+            foreach ($pages as $page) {
+                $urls[] = [
+                    'loc' => get_permalink($page),
+                    'lastmod' => $this->format_sitemap_lastmod($page),
+                    'changefreq' => $changefreq,
+                    'priority' => '0.5',
+                ];
+            }
+        }
+
+        if (!empty($options['sitemap_include_categories'])) {
+            $terms = get_terms([
+                'taxonomy' => 'category',
+                'hide_empty' => true,
+                'number' => 200,
+            ]);
+            foreach ($terms as $term) {
+                $urls[] = [
+                    'loc' => get_term_link($term),
+                    'lastmod' => gmdate('c'),
+                    'changefreq' => 'weekly',
+                    'priority' => '0.4',
+                ];
+            }
+        }
+
+        return array_values(array_filter($urls, static function ($entry) {
+            return !empty($entry['loc']);
+        }));
+    }
+
+    private function format_sitemap_lastmod($post): string
+    {
+        $date = $post->post_modified_gmt ?: $post->post_date_gmt ?: $post->post_date;
+        return $date ? gmdate('c', strtotime($date)) : gmdate('c');
+    }
+
+    private function ping_search_engines(?string $sitemapUrl): void
+    {
+        if (empty($sitemapUrl)) {
+            return;
+        }
+
+        $endpoints = [
+            'https://www.google.com/ping?sitemap=' . rawurlencode($sitemapUrl),
+            'https://www.bing.com/ping?sitemap=' . rawurlencode($sitemapUrl),
+        ];
+
+        foreach ($endpoints as $endpoint) {
+            wp_remote_get($endpoint, ['timeout' => 5, 'redirection' => 2]);
+        }
+    }
+
+    private function get_sitemap_paths(): array
+    {
+        $uploads = wp_get_upload_dir();
+        if (!empty($uploads['error'])) {
+            return ['dir' => '', 'file' => '', 'url' => ''];
+        }
+
+        $dir = trailingslashit($uploads['basedir']) . 'gd-autotag';
+        $file = trailingslashit($dir) . 'sitemap.xml';
+        $url = trailingslashit($uploads['baseurl']) . 'gd-autotag/sitemap.xml';
+
+        return [
+            'dir' => $dir,
+            'file' => $file,
+            'url' => $url,
         ];
     }
 
