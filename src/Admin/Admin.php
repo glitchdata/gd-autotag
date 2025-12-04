@@ -3,6 +3,8 @@ namespace WpPlugin\Admin;
 
 class Admin
 {
+    private const DEFAULT_SITEMAP_URI = '/sitemap/sitemap.xml';
+
     private string $file;
 
     public function __construct(string $file)
@@ -343,6 +345,14 @@ class Admin
         );
 
         add_settings_field(
+            'sitemap_custom_uri',
+            'Sitemap Location',
+            [$this, 'render_sitemap_uri_field'],
+            'gd-autotag-sitemap',
+            'gd_autotag_sitemap_section'
+        );
+
+        add_settings_field(
             'sitemap_changefreq',
             'Change Frequency',
             [$this, 'render_sitemap_changefreq_field'],
@@ -588,6 +598,11 @@ class Admin
             $sanitized['sitemap_include_categories'] = (bool) $input['sitemap_include_categories'];
         }
 
+        if (isset($input['sitemap_custom_uri'])) {
+            $uri = sanitize_text_field($input['sitemap_custom_uri']);
+            $sanitized['sitemap_custom_uri'] = $this->normalize_sitemap_uri($uri);
+        }
+
         if (isset($input['sitemap_changefreq'])) {
             $changefreq = sanitize_text_field($input['sitemap_changefreq']);
             $allowed = ['daily', 'weekly', 'monthly'];
@@ -677,6 +692,9 @@ class Admin
             echo ' · <a href="' . esc_url($sitemap_url) . '" target="_blank">View sitemap</a>';
         }
         echo '</p>';
+        if (!empty($paths['file'])) {
+            echo '<p><strong>Location:</strong> ' . esc_html($paths['file']) . '</p>';
+        }
         echo '<p><a href="' . esc_url($run_now_url) . '" class="button button-secondary">Generate Sitemap Now</a></p>';
     }
 
@@ -1157,6 +1175,29 @@ class Admin
         <span id="<?php echo esc_attr($status_id); ?>" class="gd-autotag-auto-save-status" aria-live="polite"></span>
         <span class="gd-autotag-setting-label">Include top-level categories</span>
         <p class="description">Adds category archive URLs for better topical discovery.</p>
+        <?php
+    }
+
+    public function render_sitemap_uri_field(): void
+    {
+        $options = get_option('gd_autotag_options', []);
+        $value = isset($options['sitemap_custom_uri'])
+            ? $options['sitemap_custom_uri']
+            : self::DEFAULT_SITEMAP_URI;
+        $status_id = 'gd-autotag-auto-save-sitemap-uri';
+        ?>
+        <input type="text"
+               name="gd_autotag_options[sitemap_custom_uri]"
+               value="<?php echo esc_attr($value); ?>"
+               class="regular-text code"
+               placeholder="/sitemap/sitemap.xml"
+               data-auto-save="1"
+               data-auto-save-target="<?php echo esc_attr($status_id); ?>" />
+        <span id="<?php echo esc_attr($status_id); ?>" class="gd-autotag-auto-save-status" aria-live="polite"></span>
+        <p class="description">
+            Relative URI for the sitemap (default <code>/sitemap/sitemap.xml</code>). The plugin will create the directory
+            under your public_html root if needed.
+        </p>
         <?php
     }
 
@@ -2029,20 +2070,47 @@ class Admin
 
     private function get_sitemap_paths(): array
     {
-        $uploads = wp_get_upload_dir();
-        if (!empty($uploads['error'])) {
-            return ['dir' => '', 'file' => '', 'url' => ''];
-        }
+        $options = get_option('gd_autotag_options', []);
+        $uri = isset($options['sitemap_custom_uri'])
+            ? $this->normalize_sitemap_uri($options['sitemap_custom_uri'])
+            : self::DEFAULT_SITEMAP_URI;
 
-        $dir = trailingslashit($uploads['basedir']) . 'gd-autotag';
-        $file = trailingslashit($dir) . 'sitemap.xml';
-        $url = trailingslashit($uploads['baseurl']) . 'gd-autotag/sitemap.xml';
+        $root = untrailingslashit(ABSPATH);
+        $file = $root . $uri;
+        $dir = dirname($file);
+        $url = home_url($uri);
 
         return [
             'dir' => $dir,
             'file' => $file,
             'url' => $url,
         ];
+    }
+
+    private function normalize_sitemap_uri(?string $uri): string
+    {
+        $uri = trim((string) $uri);
+        if ($uri === '') {
+            return self::DEFAULT_SITEMAP_URI;
+        }
+
+        $parsed = wp_parse_url($uri);
+        if (is_array($parsed) && isset($parsed['path'])) {
+            $uri = $parsed['path'];
+        }
+
+        $uri = '/' . ltrim($uri, '/');
+        $uri = (string) preg_replace('#/+#', '/', $uri);
+
+        if (substr($uri, -1) === '/') {
+            $uri .= 'sitemap.xml';
+        }
+
+        if (substr($uri, -4) !== '.xml') {
+            $uri .= '.xml';
+        }
+
+        return $uri;
     }
 
     public function handle_manual_schedule_run(): void
