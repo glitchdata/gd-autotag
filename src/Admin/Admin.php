@@ -16,6 +16,7 @@ class Admin
         add_action('admin_menu', [$this, 'add_admin_menu']);
         add_action('admin_init', [$this, 'register_settings']);
         add_action('admin_post_gd_autotag_run_schedule_now', [$this, 'handle_manual_schedule_run']);
+        add_action('admin_post_gd_autotag_generate_sitemap', [$this, 'handle_manual_sitemap_generation']);
         add_filter('plugin_action_links_' . plugin_basename($this->file), [$this, 'add_action_links']);
     }
 
@@ -308,6 +309,54 @@ class Admin
             'gd-autotag-analytics',
             'gd_autotag_analytics_section'
         );
+
+        // Sitemap Settings Section
+        add_settings_section(
+            'gd_autotag_sitemap_section',
+            'Sitemap Generator',
+            [$this, 'render_sitemap_section'],
+            'gd-autotag-sitemap'
+        );
+
+        add_settings_field(
+            'sitemap_enabled',
+            'Enable Sitemap',
+            [$this, 'render_sitemap_toggle_field'],
+            'gd-autotag-sitemap',
+            'gd_autotag_sitemap_section'
+        );
+
+        add_settings_field(
+            'sitemap_include_pages',
+            'Include Pages',
+            [$this, 'render_sitemap_include_pages_field'],
+            'gd-autotag-sitemap',
+            'gd_autotag_sitemap_section'
+        );
+
+        add_settings_field(
+            'sitemap_include_categories',
+            'Include Categories',
+            [$this, 'render_sitemap_include_categories_field'],
+            'gd-autotag-sitemap',
+            'gd_autotag_sitemap_section'
+        );
+
+        add_settings_field(
+            'sitemap_changefreq',
+            'Change Frequency',
+            [$this, 'render_sitemap_changefreq_field'],
+            'gd-autotag-sitemap',
+            'gd_autotag_sitemap_section'
+        );
+
+        add_settings_field(
+            'sitemap_ping_search',
+            'Ping Google/Bing',
+            [$this, 'render_sitemap_ping_field'],
+            'gd-autotag-sitemap',
+            'gd_autotag_sitemap_section'
+        );
     }
 
     public function sanitize_settings($input)
@@ -526,6 +575,31 @@ class Admin
                 $sanitized['ga_api_secret'] = $apiSecret;
             }
         }
+
+        if (isset($input['sitemap_enabled'])) {
+            $sanitized['sitemap_enabled'] = (bool) $input['sitemap_enabled'];
+        }
+
+        if (isset($input['sitemap_include_pages'])) {
+            $sanitized['sitemap_include_pages'] = (bool) $input['sitemap_include_pages'];
+        }
+
+        if (isset($input['sitemap_include_categories'])) {
+            $sanitized['sitemap_include_categories'] = (bool) $input['sitemap_include_categories'];
+        }
+
+        if (isset($input['sitemap_changefreq'])) {
+            $changefreq = sanitize_text_field($input['sitemap_changefreq']);
+            $allowed = ['daily', 'weekly', 'monthly'];
+            if (!in_array($changefreq, $allowed, true)) {
+                $changefreq = 'weekly';
+            }
+            $sanitized['sitemap_changefreq'] = $changefreq;
+        }
+
+        if (isset($input['sitemap_ping_search'])) {
+            $sanitized['sitemap_ping_search'] = (bool) $input['sitemap_ping_search'];
+        }
         
         return $sanitized;
     }
@@ -579,6 +653,31 @@ class Admin
     public function render_analytics_section(array $section = []): void
     {
         echo '<p>Connect GD AutoTag insights with Google Analytics 4 to understand how automated tagging impacts traffic.</p>';
+    }
+
+    public function render_sitemap_section(array $section = []): void
+    {
+        $last_generated = (int) get_option('gd_autotag_sitemap_last_generated', 0);
+        $paths = $this->get_sitemap_paths();
+        $sitemap_url = $paths['url'];
+        $status_text = $last_generated
+            ? sprintf('Last generated %s ago', human_time_diff($last_generated, time()))
+            : 'Not generated yet';
+
+        $run_now_url = add_query_arg(
+            [
+                'action' => 'gd_autotag_generate_sitemap',
+            ],
+            wp_nonce_url(admin_url('admin-post.php'), 'gd_autotag_generate_sitemap')
+        );
+
+        echo '<p>Create an XML sitemap tailored to GD AutoTag content so search engines can discover posts faster.</p>';
+        echo '<p><strong>Status:</strong> ' . esc_html($status_text);
+        if ($last_generated && $sitemap_url) {
+            echo ' · <a href="' . esc_url($sitemap_url) . '" target="_blank">View sitemap</a>';
+        }
+        echo '</p>';
+        echo '<p><a href="' . esc_url($run_now_url) . '" class="button button-secondary">Generate Sitemap Now</a></p>';
     }
 
     public function render_api_key_field(): void
@@ -976,6 +1075,131 @@ class Admin
         <?php
     }
 
+    public function handle_manual_sitemap_generation(): void
+    {
+        if (!current_user_can('manage_options')) {
+            wp_die('You do not have permission to perform this action.');
+        }
+
+        check_admin_referer('gd_autotag_generate_sitemap');
+
+        $success = $this->generate_sitemap();
+        $redirect = add_query_arg(
+            'gd_autotag_sitemap',
+            $success ? 'success' : 'error',
+            admin_url('admin.php?page=gd-autotag&tab=sitemap')
+        );
+
+        wp_safe_redirect($redirect);
+        exit;
+    }
+
+    public function render_sitemap_toggle_field(): void
+    {
+        $options = get_option('gd_autotag_options', []);
+        $enabled = isset($options['sitemap_enabled']) ? (bool) $options['sitemap_enabled'] : false;
+        $status_id = 'gd-autotag-auto-save-sitemap-enabled';
+        ?>
+        <input type="hidden" name="gd_autotag_options[sitemap_enabled]" value="0" />
+        <label class="gd-autotag-toggle-switch">
+            <input type="checkbox"
+                   name="gd_autotag_options[sitemap_enabled]"
+                   value="1"
+                   data-auto-save="1"
+                   data-auto-save-target="<?php echo esc_attr($status_id); ?>"
+                   <?php checked($enabled, true); ?> />
+            <span class="gd-autotag-toggle-slider"></span>
+        </label>
+        <span id="<?php echo esc_attr($status_id); ?>" class="gd-autotag-auto-save-status" aria-live="polite"></span>
+        <span class="gd-autotag-setting-label">Enable sitemap generation</span>
+        <p class="description">When enabled, GD AutoTag can generate an XML sitemap containing your most important URLs.</p>
+        <?php
+    }
+
+    public function render_sitemap_include_pages_field(): void
+    {
+        $options = get_option('gd_autotag_options', []);
+        $enabled = !empty($options['sitemap_include_pages']);
+        $status_id = 'gd-autotag-auto-save-sitemap-pages';
+        ?>
+        <input type="hidden" name="gd_autotag_options[sitemap_include_pages]" value="0" />
+        <label class="gd-autotag-toggle-switch">
+            <input type="checkbox"
+                   name="gd_autotag_options[sitemap_include_pages]"
+                   value="1"
+                   data-auto-save="1"
+                   data-auto-save-target="<?php echo esc_attr($status_id); ?>"
+                   <?php checked($enabled, true); ?> />
+            <span class="gd-autotag-toggle-slider"></span>
+        </label>
+        <span id="<?php echo esc_attr($status_id); ?>" class="gd-autotag-auto-save-status" aria-live="polite"></span>
+        <span class="gd-autotag-setting-label">Include published pages</span>
+        <p class="description">Turn on to list both posts and pages. When disabled only posts are included.</p>
+        <?php
+    }
+
+    public function render_sitemap_include_categories_field(): void
+    {
+        $options = get_option('gd_autotag_options', []);
+        $enabled = !empty($options['sitemap_include_categories']);
+        $status_id = 'gd-autotag-auto-save-sitemap-categories';
+        ?>
+        <input type="hidden" name="gd_autotag_options[sitemap_include_categories]" value="0" />
+        <label class="gd-autotag-toggle-switch">
+            <input type="checkbox"
+                   name="gd_autotag_options[sitemap_include_categories]"
+                   value="1"
+                   data-auto-save="1"
+                   data-auto-save-target="<?php echo esc_attr($status_id); ?>"
+                   <?php checked($enabled, true); ?> />
+            <span class="gd-autotag-toggle-slider"></span>
+        </label>
+        <span id="<?php echo esc_attr($status_id); ?>" class="gd-autotag-auto-save-status" aria-live="polite"></span>
+        <span class="gd-autotag-setting-label">Include top-level categories</span>
+        <p class="description">Adds category archive URLs for better topical discovery.</p>
+        <?php
+    }
+
+    public function render_sitemap_changefreq_field(): void
+    {
+        $options = get_option('gd_autotag_options', []);
+        $value = isset($options['sitemap_changefreq']) ? $options['sitemap_changefreq'] : 'weekly';
+        $status_id = 'gd-autotag-auto-save-sitemap-changefreq';
+        ?>
+        <select name="gd_autotag_options[sitemap_changefreq]"
+                data-auto-save="1"
+                data-auto-save-target="<?php echo esc_attr($status_id); ?>">
+            <option value="daily" <?php selected($value, 'daily'); ?>>Daily</option>
+            <option value="weekly" <?php selected($value, 'weekly'); ?>>Weekly</option>
+            <option value="monthly" <?php selected($value, 'monthly'); ?>>Monthly</option>
+        </select>
+        <span id="<?php echo esc_attr($status_id); ?>" class="gd-autotag-auto-save-status" aria-live="polite"></span>
+        <p class="description">Applies to all URLs in the generated sitemap.</p>
+        <?php
+    }
+
+    public function render_sitemap_ping_field(): void
+    {
+        $options = get_option('gd_autotag_options', []);
+        $enabled = !empty($options['sitemap_ping_search']);
+        $status_id = 'gd-autotag-auto-save-sitemap-ping';
+        ?>
+        <input type="hidden" name="gd_autotag_options[sitemap_ping_search]" value="0" />
+        <label class="gd-autotag-toggle-switch">
+            <input type="checkbox"
+                   name="gd_autotag_options[sitemap_ping_search]"
+                   value="1"
+                   data-auto-save="1"
+                   data-auto-save-target="<?php echo esc_attr($status_id); ?>"
+                   <?php checked($enabled, true); ?> />
+            <span class="gd-autotag-toggle-slider"></span>
+        </label>
+        <span id="<?php echo esc_attr($status_id); ?>" class="gd-autotag-auto-save-status" aria-live="polite"></span>
+        <span class="gd-autotag-setting-label">Ping Google and Bing after generation</span>
+        <p class="description">Sends a notification to search engines whenever you manually build the sitemap.</p>
+        <?php
+    }
+
     public function render_ai_optimization_field(): void
     {
         $options = get_option('gd_autotag_options', []);
@@ -1075,6 +1299,7 @@ class Admin
         }
 
         $scheduleRunStatus = isset($_GET['gd_autotag_schedule_run']) ? sanitize_text_field($_GET['gd_autotag_schedule_run']) : '';
+        $sitemapStatus = isset($_GET['gd_autotag_sitemap']) ? sanitize_text_field($_GET['gd_autotag_sitemap']) : '';
 
         ?>
         <div class="wrap">
@@ -1088,6 +1313,15 @@ class Admin
                     <p>Unable to run the scheduled job. Please check logs and try again.</p>
                 </div>
             <?php endif; ?>
+            <?php if ($sitemapStatus === 'success'): ?>
+                <div class="notice notice-success is-dismissible">
+                    <p>✓ Sitemap generated successfully.</p>
+                </div>
+            <?php elseif ($sitemapStatus === 'error'): ?>
+                <div class="notice notice-error is-dismissible">
+                    <p>Unable to generate sitemap. Please check permissions and try again.</p>
+                </div>
+            <?php endif; ?>
             <h2 class="nav-tab-wrapper">
                 <a href="?page=gd-autotag&tab=dashboard" class="nav-tab <?php echo (!isset($_GET['tab']) || $_GET['tab'] === 'dashboard') ? 'nav-tab-active' : ''; ?>">Dashboard</a>
                 <a href="?page=gd-autotag&tab=settings" class="nav-tab <?php echo (isset($_GET['tab']) && $_GET['tab'] === 'settings') ? 'nav-tab-active' : ''; ?>">Settings</a>
@@ -1095,6 +1329,7 @@ class Admin
                 <a href="?page=gd-autotag&tab=auto-categories" class="nav-tab <?php echo (isset($_GET['tab']) && $_GET['tab'] === 'auto-categories') ? 'nav-tab-active' : ''; ?>">Auto Categories</a>
                 <a href="?page=gd-autotag&tab=advanced" class="nav-tab <?php echo (isset($_GET['tab']) && $_GET['tab'] === 'advanced') ? 'nav-tab-active' : ''; ?>">Advanced</a>
                 <a href="?page=gd-autotag&tab=analytics" class="nav-tab <?php echo (isset($_GET['tab']) && $_GET['tab'] === 'analytics') ? 'nav-tab-active' : ''; ?>">Analytics</a>
+                <a href="?page=gd-autotag&tab=sitemap" class="nav-tab <?php echo (isset($_GET['tab']) && $_GET['tab'] === 'sitemap') ? 'nav-tab-active' : ''; ?>">Sitemap</a>
             </h2>
 
             <?php
@@ -1359,6 +1594,16 @@ class Admin
                     ?>
                 </form>
                 <?php
+            } elseif ($tab === 'sitemap') {
+                ?>
+                <form method="post" action="options.php">
+                    <?php
+                    settings_fields('gd_autotag_settings');
+                    do_settings_sections('gd-autotag-sitemap');
+                    submit_button('Save Sitemap Settings');
+                    ?>
+                </form>
+                <?php
             }
             ?>
         </div>
@@ -1612,6 +1857,168 @@ class Admin
         
         $status_code = wp_remote_retrieve_response_code($response);
         $body = wp_remote_retrieve_body($response);
+
+        private function generate_sitemap(): bool
+        {
+            $options = get_option('gd_autotag_options', []);
+            if (empty($options['sitemap_enabled'])) {
+                return false;
+            }
+
+            $urls = $this->collect_sitemap_urls($options);
+            if (empty($urls)) {
+                return false;
+            }
+
+            $paths = $this->get_sitemap_paths();
+            if (empty($paths['file']) || empty($paths['dir'])) {
+                return false;
+            }
+
+            if (!wp_mkdir_p($paths['dir'])) {
+                return false;
+            }
+
+            $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+            $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
+            foreach ($urls as $entry) {
+                $xml .= "  <url>\n";
+                $xml .= '    <loc>' . esc_url($entry['loc']) . "</loc>\n";
+                if (!empty($entry['lastmod'])) {
+                    $xml .= '    <lastmod>' . esc_html($entry['lastmod']) . "</lastmod>\n";
+                }
+                if (!empty($entry['changefreq'])) {
+                    $xml .= '    <changefreq>' . esc_html($entry['changefreq']) . "</changefreq>\n";
+                }
+                if (!empty($entry['priority'])) {
+                    $xml .= '    <priority>' . esc_html($entry['priority']) . "</priority>\n";
+                }
+                $xml .= "  </url>\n";
+            }
+            $xml .= '</urlset>' . "\n";
+
+            $written = file_put_contents($paths['file'], $xml);
+            if ($written === false) {
+                return false;
+            }
+
+            update_option('gd_autotag_sitemap_last_generated', time());
+
+            if (!empty($options['sitemap_ping_search'])) {
+                $this->ping_search_engines($paths['url']);
+            }
+
+            do_action('gd_autotag_sitemap_generated', $paths['file'], $paths['url']);
+
+            return true;
+        }
+
+        private function collect_sitemap_urls(array $options): array
+        {
+            $urls = [];
+            $changefreq = $options['sitemap_changefreq'] ?? 'weekly';
+
+            $urls[] = [
+                'loc' => home_url('/'),
+                'lastmod' => gmdate('c'),
+                'changefreq' => 'daily',
+                'priority' => '1.0',
+            ];
+
+            $posts = get_posts([
+                'post_type' => 'post',
+                'post_status' => 'publish',
+                'numberposts' => -1,
+                'orderby' => 'date',
+                'order' => 'DESC',
+            ]);
+            foreach ($posts as $post) {
+                $urls[] = [
+                    'loc' => get_permalink($post),
+                    'lastmod' => $this->format_sitemap_lastmod($post),
+                    'changefreq' => $changefreq,
+                    'priority' => '0.7',
+                ];
+            }
+
+            if (!empty($options['sitemap_include_pages'])) {
+                $pages = get_posts([
+                    'post_type' => 'page',
+                    'post_status' => 'publish',
+                    'numberposts' => -1,
+                    'orderby' => 'date',
+                    'order' => 'DESC',
+                ]);
+                foreach ($pages as $page) {
+                    $urls[] = [
+                        'loc' => get_permalink($page),
+                        'lastmod' => $this->format_sitemap_lastmod($page),
+                        'changefreq' => $changefreq,
+                        'priority' => '0.5',
+                    ];
+                }
+            }
+
+            if (!empty($options['sitemap_include_categories'])) {
+                $terms = get_terms([
+                    'taxonomy' => 'category',
+                    'hide_empty' => true,
+                    'number' => 200,
+                ]);
+                foreach ($terms as $term) {
+                    $urls[] = [
+                        'loc' => get_term_link($term),
+                        'lastmod' => gmdate('c'),
+                        'changefreq' => 'weekly',
+                        'priority' => '0.4',
+                    ];
+                }
+            }
+
+            return array_values(array_filter($urls, static function ($entry) {
+                return !empty($entry['loc']);
+            }));
+        }
+
+        private function format_sitemap_lastmod($post): string
+        {
+            $date = $post->post_modified_gmt ?: $post->post_date_gmt ?: $post->post_date;
+            return $date ? gmdate('c', strtotime($date)) : gmdate('c');
+        }
+
+        private function ping_search_engines(?string $sitemapUrl): void
+        {
+            if (empty($sitemapUrl)) {
+                return;
+            }
+
+            $endpoints = [
+                'https://www.google.com/ping?sitemap=' . rawurlencode($sitemapUrl),
+                'https://www.bing.com/ping?sitemap=' . rawurlencode($sitemapUrl),
+            ];
+
+            foreach ($endpoints as $endpoint) {
+                wp_remote_get($endpoint, ['timeout' => 5, 'redirection' => 2]);
+            }
+        }
+
+        private function get_sitemap_paths(): array
+        {
+            $uploads = wp_get_upload_dir();
+            if (!empty($uploads['error'])) {
+                return ['dir' => '', 'file' => '', 'url' => ''];
+            }
+
+            $dir = trailingslashit($uploads['basedir']) . 'gd-autotag';
+            $file = trailingslashit($dir) . 'sitemap.xml';
+            $url = trailingslashit($uploads['baseurl']) . 'gd-autotag/sitemap.xml';
+
+            return [
+                'dir' => $dir,
+                'file' => $file,
+                'url' => $url,
+            ];
+        }
         $data = json_decode($body, true);
         
         // Check response
