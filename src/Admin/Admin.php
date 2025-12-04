@@ -329,9 +329,25 @@ class Admin
         );
 
         add_settings_field(
+            'sitemap_include_posts',
+            'Include Posts',
+            [$this, 'render_sitemap_include_posts_field'],
+            'gd-autotag-sitemap',
+            'gd_autotag_sitemap_section'
+        );
+
+        add_settings_field(
             'sitemap_include_pages',
             'Include Pages',
             [$this, 'render_sitemap_include_pages_field'],
+            'gd-autotag-sitemap',
+            'gd_autotag_sitemap_section'
+        );
+
+        add_settings_field(
+            'sitemap_include_products',
+            'Include Products',
+            [$this, 'render_sitemap_include_products_field'],
             'gd-autotag-sitemap',
             'gd_autotag_sitemap_section'
         );
@@ -590,8 +606,16 @@ class Admin
             $sanitized['sitemap_enabled'] = (bool) $input['sitemap_enabled'];
         }
 
+        if (isset($input['sitemap_include_posts'])) {
+            $sanitized['sitemap_include_posts'] = (bool) $input['sitemap_include_posts'];
+        }
+
         if (isset($input['sitemap_include_pages'])) {
             $sanitized['sitemap_include_pages'] = (bool) $input['sitemap_include_pages'];
+        }
+
+        if (isset($input['sitemap_include_products'])) {
+            $sanitized['sitemap_include_products'] = (bool) $input['sitemap_include_products'];
         }
 
         if (isset($input['sitemap_include_categories'])) {
@@ -696,10 +720,16 @@ class Admin
         }
         echo '</p>';
         if (!empty($paths['file'])) {
-            echo '<p><strong>Configured target:</strong> ' . esc_html($paths['file']) . '</p>';
+            $configuredPath = $this->format_path_from_public_html($paths['file']);
+            if ($configuredPath) {
+                echo '<p><strong>Configured target:</strong> ' . esc_html($configuredPath) . '</p>';
+            }
         }
-        if ($sitemap_file && $sitemap_file !== $paths['file']) {
-            echo '<p><strong>Current file:</strong> ' . esc_html($sitemap_file) . '</p>';
+        if ($sitemap_file) {
+            $currentPath = $this->format_path_from_public_html($sitemap_file);
+            if ($currentPath && $currentPath !== ($configuredPath ?? '')) {
+                echo '<p><strong>Current file:</strong> ' . esc_html($currentPath) . '</p>';
+            }
         }
         echo '<p><a href="' . esc_url($run_now_url) . '" class="button button-secondary">Generate Sitemap Now</a></p>';
     }
@@ -1116,11 +1146,14 @@ class Admin
         } else {
             $status = !empty($result['fallback_used']) ? 'fallback' : 'success';
             if (!empty($result['fallback_used'])) {
-                $preferred = $result['preferred']['file'] ?? $result['path']['file'];
+                $preferredAbsolute = $result['preferred']['file'] ?? $result['path']['file'];
+                $fallbackAbsolute = $result['path']['file'];
+                $preferred = $this->format_path_from_public_html($preferredAbsolute) ?: $preferredAbsolute;
+                $fallback = $this->format_path_from_public_html($fallbackAbsolute) ?: $fallbackAbsolute;
                 $message = sprintf(
                     'Primary path %s was not writable. Sitemap generated at %s instead.',
                     $preferred,
-                    $result['path']['file']
+                    $fallback
                 );
                 set_transient('gd_autotag_sitemap_notice', $message, MINUTE_IN_SECONDS);
             } else {
@@ -1160,6 +1193,30 @@ class Admin
         <?php
     }
 
+    public function render_sitemap_include_posts_field(): void
+    {
+        $options = get_option('gd_autotag_options', []);
+        $enabled = array_key_exists('sitemap_include_posts', $options)
+            ? (bool) $options['sitemap_include_posts']
+            : true;
+        $status_id = 'gd-autotag-auto-save-sitemap-posts';
+        ?>
+        <input type="hidden" name="gd_autotag_options[sitemap_include_posts]" value="0" />
+        <label class="gd-autotag-toggle-switch">
+            <input type="checkbox"
+                   name="gd_autotag_options[sitemap_include_posts]"
+                   value="1"
+                   data-auto-save="1"
+                   data-auto-save-target="<?php echo esc_attr($status_id); ?>"
+                   <?php checked($enabled, true); ?> />
+            <span class="gd-autotag-toggle-slider"></span>
+        </label>
+        <span id="<?php echo esc_attr($status_id); ?>" class="gd-autotag-auto-save-status" aria-live="polite"></span>
+        <span class="gd-autotag-setting-label">Include published posts</span>
+        <p class="description">Disable to omit blog posts entirely, focusing on other content types.</p>
+        <?php
+    }
+
     public function render_sitemap_include_pages_field(): void
     {
         $options = get_option('gd_autotag_options', []);
@@ -1178,7 +1235,36 @@ class Admin
         </label>
         <span id="<?php echo esc_attr($status_id); ?>" class="gd-autotag-auto-save-status" aria-live="polite"></span>
         <span class="gd-autotag-setting-label">Include published pages</span>
-        <p class="description">Turn on to list both posts and pages. When disabled only posts are included.</p>
+        <p class="description">Adds static pages alongside whichever post types you enable above.</p>
+        <?php
+    }
+
+    public function render_sitemap_include_products_field(): void
+    {
+        $options = get_option('gd_autotag_options', []);
+        $enabled = !empty($options['sitemap_include_products']);
+        $status_id = 'gd-autotag-auto-save-sitemap-products';
+        $disabled = !post_type_exists('product');
+        ?>
+        <input type="hidden" name="gd_autotag_options[sitemap_include_products]" value="0" />
+        <label class="gd-autotag-toggle-switch <?php echo $disabled ? 'gd-autotag-toggle-disabled' : ''; ?>">
+            <input type="checkbox"
+                   name="gd_autotag_options[sitemap_include_products]"
+                   value="1"
+                   data-auto-save="1"
+                   data-auto-save-target="<?php echo esc_attr($status_id); ?>"
+                   <?php disabled($disabled, true); ?>
+                   <?php checked($enabled, true); ?> />
+            <span class="gd-autotag-toggle-slider"></span>
+        </label>
+        <span id="<?php echo esc_attr($status_id); ?>" class="gd-autotag-auto-save-status" aria-live="polite"></span>
+        <span class="gd-autotag-setting-label">Include WooCommerce products</span>
+        <p class="description">
+            Adds single product URLs when the <code>product</code> post type is available.
+            <?php if ($disabled): ?>
+                <em>(Enable WooCommerce to activate this option.)</em>
+            <?php endif; ?>
+        </p>
         <?php
     }
 
@@ -2034,6 +2120,12 @@ class Admin
     {
         $urls = [];
         $changefreq = $options['sitemap_changefreq'] ?? 'weekly';
+        $includePosts = array_key_exists('sitemap_include_posts', $options)
+            ? (bool) $options['sitemap_include_posts']
+            : true;
+        $includePages = !empty($options['sitemap_include_pages']);
+        $includeCategories = !empty($options['sitemap_include_categories']);
+        $includeProducts = !empty($options['sitemap_include_products']);
 
         $urls[] = [
             'loc' => home_url('/'),
@@ -2042,23 +2134,25 @@ class Admin
             'priority' => '1.0',
         ];
 
-        $posts = get_posts([
-            'post_type' => 'post',
-            'post_status' => 'publish',
-            'numberposts' => -1,
-            'orderby' => 'date',
-            'order' => 'DESC',
-        ]);
-        foreach ($posts as $post) {
-            $urls[] = [
-                'loc' => get_permalink($post),
-                'lastmod' => $this->format_sitemap_lastmod($post),
-                'changefreq' => $changefreq,
-                'priority' => '0.7',
-            ];
+        if ($includePosts) {
+            $posts = get_posts([
+                'post_type' => 'post',
+                'post_status' => 'publish',
+                'numberposts' => -1,
+                'orderby' => 'date',
+                'order' => 'DESC',
+            ]);
+            foreach ($posts as $post) {
+                $urls[] = [
+                    'loc' => get_permalink($post),
+                    'lastmod' => $this->format_sitemap_lastmod($post),
+                    'changefreq' => $changefreq,
+                    'priority' => '0.7',
+                ];
+            }
         }
 
-        if (!empty($options['sitemap_include_pages'])) {
+        if ($includePages) {
             $pages = get_posts([
                 'post_type' => 'page',
                 'post_status' => 'publish',
@@ -2076,7 +2170,25 @@ class Admin
             }
         }
 
-        if (!empty($options['sitemap_include_categories'])) {
+        if ($includeProducts && post_type_exists('product')) {
+            $products = get_posts([
+                'post_type' => 'product',
+                'post_status' => 'publish',
+                'numberposts' => -1,
+                'orderby' => 'date',
+                'order' => 'DESC',
+            ]);
+            foreach ($products as $product) {
+                $urls[] = [
+                    'loc' => get_permalink($product),
+                    'lastmod' => $this->format_sitemap_lastmod($product),
+                    'changefreq' => $changefreq,
+                    'priority' => '0.6',
+                ];
+            }
+        }
+
+        if ($includeCategories) {
             $terms = get_terms([
                 'taxonomy' => 'category',
                 'hide_empty' => true,
@@ -2196,6 +2308,28 @@ class Admin
         }
 
         return true;
+    }
+
+    private function format_path_from_public_html(?string $absolutePath): string
+    {
+        if (empty($absolutePath)) {
+            return '';
+        }
+
+        $normalized = wp_normalize_path($absolutePath);
+        $marker = '/public_html';
+        $pos = strpos($normalized, $marker);
+        if ($pos !== false) {
+            return ltrim(substr($normalized, $pos), '/');
+        }
+
+        $root = wp_normalize_path(untrailingslashit(ABSPATH));
+        if (strpos($normalized, $root) === 0) {
+            $relative = ltrim(substr($normalized, strlen($root)), '/');
+            return $relative !== '' ? $relative : basename($normalized);
+        }
+
+        return basename($normalized);
     }
 
     private function normalize_sitemap_uri(?string $uri): string
