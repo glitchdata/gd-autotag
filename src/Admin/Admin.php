@@ -14,6 +14,10 @@ class Admin
     ];
 
     private const DEFAULT_SITEMAP_URI = '/sitemap/sitemap.xml';
+    private const SITEMAP_LOCATION_CHOICES = [
+        'public_html' => '/sitemap/sitemap.xml',
+        'uploads' => '/wp-content/uploads/gd-autotag/sitemap.xml',
+    ];
 
     private string $file;
 
@@ -637,9 +641,20 @@ class Admin
             $sanitized['sitemap_include_categories'] = (bool) $input['sitemap_include_categories'];
         }
 
-        if (isset($input['sitemap_custom_uri'])) {
+        if (isset($input['sitemap_location_choice'])) {
+            $choice = sanitize_text_field($input['sitemap_location_choice']);
+            if (isset(self::SITEMAP_LOCATION_CHOICES[$choice])) {
+                $sanitized['sitemap_custom_uri'] = self::SITEMAP_LOCATION_CHOICES[$choice];
+                $sanitized['sitemap_location_choice'] = $choice;
+            } else {
+                $sanitized['sitemap_custom_uri'] = self::DEFAULT_SITEMAP_URI;
+                $sanitized['sitemap_location_choice'] = 'public_html';
+            }
+        } elseif (isset($input['sitemap_custom_uri'])) {
+            // Backwards compatibility: accept direct URI submission (e.g., from older versions or filters)
             $uri = sanitize_text_field($input['sitemap_custom_uri']);
             $sanitized['sitemap_custom_uri'] = $this->normalize_sitemap_uri($uri);
+            $sanitized['sitemap_location_choice'] = array_search($sanitized['sitemap_custom_uri'], self::SITEMAP_LOCATION_CHOICES, true) ?: 'custom';
         }
 
         if (isset($input['sitemap_changefreq'])) {
@@ -1308,23 +1323,44 @@ class Admin
     public function render_sitemap_uri_field(): void
     {
         $options = get_option('gd_autotag_options', []);
-        $value = isset($options['sitemap_custom_uri'])
+        $currentUri = isset($options['sitemap_custom_uri'])
             ? $options['sitemap_custom_uri']
             : self::DEFAULT_SITEMAP_URI;
-        $status_id = 'gd-autotag-auto-save-sitemap-uri';
+        $detectedChoice = array_search($currentUri, self::SITEMAP_LOCATION_CHOICES, true);
+        if ($detectedChoice === false) {
+            $detectedChoice = 'custom';
+        }
+        $choice = $options['sitemap_location_choice'] ?? $detectedChoice;
+        if ($choice !== 'custom' && !isset(self::SITEMAP_LOCATION_CHOICES[$choice])) {
+            $choice = 'public_html';
+        }
+        $status_id = 'gd-autotag-auto-save-sitemap-location';
         ?>
-        <input type="text"
-               name="gd_autotag_options[sitemap_custom_uri]"
-               value="<?php echo esc_attr($value); ?>"
-               class="regular-text code"
-               placeholder="/sitemap/sitemap.xml"
-               data-auto-save="1"
-               data-auto-save-target="<?php echo esc_attr($status_id); ?>" />
+        <select name="gd_autotag_options[sitemap_location_choice]"
+                data-auto-save="1"
+                data-auto-save-target="<?php echo esc_attr($status_id); ?>">
+            <?php if ($choice === 'custom' && $detectedChoice === 'custom'): ?>
+                <option value="custom" selected disabled>Custom (<?php echo esc_html($currentUri); ?>)</option>
+            <?php endif; ?>
+            <?php foreach (self::SITEMAP_LOCATION_CHOICES as $key => $uri): ?>
+                <option value="<?php echo esc_attr($key); ?>" <?php selected($choice, $key); ?>>
+                    <?php
+                    $label = $key === 'public_html'
+                        ? 'Public HTML '
+                        : 'Uploads Directory ';
+                    echo esc_html($label . '(' . $uri . ')');
+                    ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
         <span id="<?php echo esc_attr($status_id); ?>" class="gd-autotag-auto-save-status" aria-live="polite"></span>
-        <p class="description">
-            Relative URI for the sitemap (default <code>/sitemap/sitemap.xml</code>). The plugin will create the directory
-            under your public_html root if needed.
-        </p>
+        <?php if ($choice === 'uploads'): ?>
+            <p class="description">Stores the sitemap inside <code>wp-content/uploads/gd-autotag/</code>, which is writable on most hosts.</p>
+        <?php elseif ($choice === 'public_html'): ?>
+            <p class="description">Places the sitemap at <code>/sitemap/sitemap.xml</code> under your public_html root.</p>
+        <?php elseif ($choice === 'custom'): ?>
+            <p class="description warning">Using custom path <code><?php echo esc_html($currentUri); ?></code>. Switching options above will replace it.</p>
+        <?php endif; ?>
         <?php
     }
 
