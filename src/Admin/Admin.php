@@ -674,7 +674,10 @@ class Admin
     {
         $last_generated = (int) get_option('gd_autotag_sitemap_last_generated', 0);
         $paths = $this->get_sitemap_paths();
-        $sitemap_url = $paths['url'];
+        $stored_url = get_option('gd_autotag_sitemap_last_url');
+        $stored_file = get_option('gd_autotag_sitemap_last_file');
+        $sitemap_url = $stored_url ?: $paths['url'];
+        $sitemap_file = $stored_file ?: $paths['file'];
         $status_text = $last_generated
             ? sprintf('Last generated %s ago', human_time_diff($last_generated, time()))
             : 'Not generated yet';
@@ -693,7 +696,10 @@ class Admin
         }
         echo '</p>';
         if (!empty($paths['file'])) {
-            echo '<p><strong>Location:</strong> ' . esc_html($paths['file']) . '</p>';
+            echo '<p><strong>Configured target:</strong> ' . esc_html($paths['file']) . '</p>';
+        }
+        if ($sitemap_file && $sitemap_file !== $paths['file']) {
+            echo '<p><strong>Current file:</strong> ' . esc_html($sitemap_file) . '</p>';
         }
         echo '<p><a href="' . esc_url($run_now_url) . '" class="button button-secondary">Generate Sitemap Now</a></p>';
     }
@@ -1101,10 +1107,30 @@ class Admin
 
         check_admin_referer('gd_autotag_generate_sitemap');
 
-        $success = $this->generate_sitemap();
+        $result = $this->generate_sitemap();
+        $status = 'success';
+
+        if (is_wp_error($result)) {
+            set_transient('gd_autotag_sitemap_error', $result->get_error_message(), MINUTE_IN_SECONDS);
+            $status = 'error';
+        } else {
+            $status = !empty($result['fallback_used']) ? 'fallback' : 'success';
+            if (!empty($result['fallback_used'])) {
+                $preferred = $result['preferred']['file'] ?? $result['path']['file'];
+                $message = sprintf(
+                    'Primary path %s was not writable. Sitemap generated at %s instead.',
+                    $preferred,
+                    $result['path']['file']
+                );
+                set_transient('gd_autotag_sitemap_notice', $message, MINUTE_IN_SECONDS);
+            } else {
+                delete_transient('gd_autotag_sitemap_notice');
+            }
+        }
+
         $redirect = add_query_arg(
             'gd_autotag_sitemap',
-            $success ? 'success' : 'error',
+            $status,
             admin_url('admin.php?page=gd-autotag&tab=sitemap')
         );
 
@@ -1341,6 +1367,8 @@ class Admin
 
         $scheduleRunStatus = isset($_GET['gd_autotag_schedule_run']) ? sanitize_text_field($_GET['gd_autotag_schedule_run']) : '';
         $sitemapStatus = isset($_GET['gd_autotag_sitemap']) ? sanitize_text_field($_GET['gd_autotag_sitemap']) : '';
+        $sitemapNoticeMessage = get_transient('gd_autotag_sitemap_notice');
+        $sitemapErrorMessage = get_transient('gd_autotag_sitemap_error');
 
         ?>
         <div class="wrap">
@@ -1358,11 +1386,23 @@ class Admin
                 <div class="notice notice-success is-dismissible">
                     <p>✓ Sitemap generated successfully.</p>
                 </div>
+            <?php elseif ($sitemapStatus === 'fallback'): ?>
+                <div class="notice notice-warning is-dismissible">
+                    <p><?php echo esc_html($sitemapNoticeMessage ?: 'Sitemap created using a fallback location because the configured path was not writable.'); ?></p>
+                </div>
             <?php elseif ($sitemapStatus === 'error'): ?>
                 <div class="notice notice-error is-dismissible">
-                    <p>Unable to generate sitemap. Please check permissions and try again.</p>
+                    <p><?php echo esc_html($sitemapErrorMessage ?: 'Unable to generate the sitemap. Please review file permissions and try again.'); ?></p>
                 </div>
             <?php endif; ?>
+            <?php
+            if ($sitemapNoticeMessage) {
+                delete_transient('gd_autotag_sitemap_notice');
+            }
+            if ($sitemapErrorMessage) {
+                delete_transient('gd_autotag_sitemap_error');
+            }
+            ?>
             <h2 class="nav-tab-wrapper">
                 <a href="?page=gd-autotag&tab=dashboard" class="nav-tab <?php echo (!isset($_GET['tab']) || $_GET['tab'] === 'dashboard') ? 'nav-tab-active' : ''; ?>">Dashboard</a>
                 <a href="?page=gd-autotag&tab=settings" class="nav-tab <?php echo (isset($_GET['tab']) && $_GET['tab'] === 'settings') ? 'nav-tab-active' : ''; ?>">Settings</a>
@@ -1924,25 +1964,22 @@ class Admin
         ];
     }
 
-    private function generate_sitemap(): bool
+    private function generate_sitemap()
     {
         $options = get_option('gd_autotag_options', []);
         if (empty($options['sitemap_enabled'])) {
-            return false;
+            return new \WP_Error('gd_autotag_sitemap_disabled', 'Sitemap generation is currently disabled.');
         }
 
         $urls = $this->collect_sitemap_urls($options);
         if (empty($urls)) {
-            return false;
+            return new \WP_Error('gd_autotag_sitemap_empty', 'No URLs are available for inclusion in the sitemap.');
         }
 
-        $paths = $this->get_sitemap_paths();
-        if (empty($paths['file']) || empty($paths['dir'])) {
-            return false;
-        }
-
-        if (!wp_mkdir_p($paths['dir'])) {
-            return false;
+        $preferredPaths = $this->get_sitemap_paths();
+        $candidates = $this->get_sitemap_candidates();
+        if (empty($candidates)) {
+            return new \WP_Error('gd_autotag_sitemap_paths', 'No valid sitemap locations are available.');
         }
 
         $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
@@ -1963,20 +2000,34 @@ class Admin
         }
         $xml .= '</urlset>' . "\n";
 
-        $written = file_put_contents($paths['file'], $xml);
-        if ($written === false) {
-            return false;
+        $lastError = null;
+        foreach ($candidates as $paths) {
+            $writeResult = $this->write_sitemap_to_path($paths, $xml);
+            if ($writeResult === true) {
+                $timestamp = time();
+                update_option('gd_autotag_sitemap_last_generated', $timestamp);
+                update_option('gd_autotag_sitemap_last_file', $paths['file']);
+                update_option('gd_autotag_sitemap_last_url', $paths['url']);
+
+                if (!empty($options['sitemap_ping_search'])) {
+                    $this->ping_search_engines($paths['url']);
+                }
+
+                do_action('gd_autotag_sitemap_generated', $paths['file'], $paths['url']);
+
+                return [
+                    'path' => $paths,
+                    'preferred' => $preferredPaths,
+                    'fallback_used' => !empty($paths['is_fallback']),
+                ];
+            }
+
+            if ($writeResult instanceof \WP_Error) {
+                $lastError = $writeResult;
+            }
         }
 
-        update_option('gd_autotag_sitemap_last_generated', time());
-
-        if (!empty($options['sitemap_ping_search'])) {
-            $this->ping_search_engines($paths['url']);
-        }
-
-        do_action('gd_autotag_sitemap_generated', $paths['file'], $paths['url']);
-
-        return true;
+        return $lastError ?: new \WP_Error('gd_autotag_sitemap_write_failed', 'Unable to create the sitemap file in any configured location.');
     }
 
     private function collect_sitemap_urls(array $options): array
@@ -2084,7 +2135,67 @@ class Admin
             'dir' => $dir,
             'file' => $file,
             'url' => $url,
+            'label' => 'custom',
+            'is_fallback' => false,
         ];
+    }
+
+    private function get_sitemap_candidates(): array
+    {
+        $candidates = [];
+        $primary = $this->get_sitemap_paths();
+        if (!empty($primary['file']) && !empty($primary['dir'])) {
+            $candidates[] = $primary;
+        }
+
+        $uploads = wp_get_upload_dir();
+        if (empty($uploads['error'])) {
+            $dir = trailingslashit($uploads['basedir']) . 'gd-autotag';
+            $file = trailingslashit($dir) . 'sitemap.xml';
+            $url = trailingslashit($uploads['baseurl']) . 'gd-autotag/sitemap.xml';
+
+            if (empty($primary) || $file !== $primary['file']) {
+                $candidates[] = [
+                    'dir' => $dir,
+                    'file' => $file,
+                    'url' => $url,
+                    'label' => 'uploads',
+                    'is_fallback' => true,
+                ];
+            }
+        }
+
+        return $candidates;
+    }
+
+    private function write_sitemap_to_path(array $paths, string $xml)
+    {
+        if (empty($paths['dir']) || empty($paths['file'])) {
+            return new \WP_Error('gd_autotag_sitemap_path', 'Invalid sitemap path configuration.');
+        }
+
+        if (!wp_mkdir_p($paths['dir'])) {
+            return new \WP_Error('gd_autotag_sitemap_dir', sprintf('Unable to create directory %s. Check permissions.', $paths['dir']));
+        }
+
+        if (!function_exists('wp_is_writable')) {
+            require_once ABSPATH . 'wp-admin/includes/file.php';
+        }
+
+        if (!wp_is_writable($paths['dir'])) {
+            @chmod($paths['dir'], 0755);
+            clearstatcache(false, $paths['dir']);
+            if (!wp_is_writable($paths['dir'])) {
+                return new \WP_Error('gd_autotag_sitemap_permissions', sprintf('Directory %s is not writable.', $paths['dir']));
+            }
+        }
+
+        $written = file_put_contents($paths['file'], $xml);
+        if ($written === false) {
+            return new \WP_Error('gd_autotag_sitemap_write', sprintf('Failed to write sitemap file to %s.', $paths['file']));
+        }
+
+        return true;
     }
 
     private function normalize_sitemap_uri(?string $uri): string
