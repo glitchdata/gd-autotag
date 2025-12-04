@@ -8,7 +8,7 @@ class Admin
         'settings' => 'Settings',
         'auto-tagging' => 'Auto Tag',
         'auto-categories' => 'Auto Categories',
-        'advanced' => 'Advanced',
+        'advanced' => 'AI',
         'analytics' => 'Analytics',
         'sitemap' => 'Sitemap',
     ];
@@ -255,10 +255,10 @@ class Admin
             'gd_autotag_schedule_section'
         );
 
-        // Advanced Settings Section
+        // AI Settings Section
         add_settings_section(
             'gd_autotag_advanced_section',
-            'Advanced Settings',
+            'AI Settings',
             [$this, 'render_advanced_section'],
             'gd-autotag-advanced'
         );
@@ -701,7 +701,7 @@ class Admin
 
     public function render_advanced_section(array $section = []): void
     {
-        echo '<p>Advanced options for debugging, AI integrations, and power users.</p>';
+        echo '<p>Configure AI integrations, provider credentials, and power-user diagnostics.</p>';
     }
 
     public function render_analytics_section(array $section = []): void
@@ -1764,7 +1764,7 @@ class Admin
                     <?php
                     settings_fields('gd_autotag_settings');
                     do_settings_sections('gd-autotag-advanced');
-                    submit_button('Save Advanced Settings');
+                    submit_button('Save AI Settings');
                     ?>
                 </form>
                 <?php
